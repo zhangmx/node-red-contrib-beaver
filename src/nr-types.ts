@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// import {NodeMessage} from "node-red"
+
 export type SendEvent = {
     msg: any,
     source: {

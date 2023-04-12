@@ -33,6 +33,8 @@ export class Location {
 }
 
 export function createLocation(event:ReceiveEvent|SendEvent): Location {
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let node:any;
     let portType:PortType;
     let portIndex:number;

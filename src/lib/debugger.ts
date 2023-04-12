@@ -3,6 +3,7 @@ import { Breakpoint, PausedEvent, MessageEvent } from "./types"
 import { ReceiveEvent, SendEvent, EventCallback } from "../nr-types"
 import { MessageQueue } from "./MessageQueue"
 import { EventEmitter } from "events"
+import { NodeAPI } from "node-red";
 
 const DEBUGGER_PAUSED = Symbol("node-red-contrib-beaver: paused");
 
@@ -17,7 +18,7 @@ let BREAKPOINT_ID = 1;
 
 export class Debugger extends EventEmitter {
 
-    RED: any;
+    RED: NodeAPI;
     enabled: boolean;
     pausedLocations: Set<string>;
     breakpoints: Map<string, Breakpoint>;
@@ -30,7 +31,7 @@ export class Debugger extends EventEmitter {
     // Events:
     //  paused / resumed
 
-    constructor(RED: any) {
+    constructor(RED: NodeAPI) {
         super();
         this.config = {
             breakpointAction: "pause-all"
@@ -505,6 +506,7 @@ function isSendEvent(event: SendEvent | ReceiveEvent): event is SendEvent {
 
 const MODULE_TYPE_RE = /^module:/;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function isNodeInSubflowModule(node: any) {
     let f = node._flow;
     do {
