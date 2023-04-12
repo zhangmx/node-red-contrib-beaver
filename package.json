@@ -1,0 +1,61 @@
+{
+  "name": "node-red-contrib-beaver",
+  "version": "1.0.0",
+  "description": "flows recorder for node-red testing",
+  "main": "index.js",
+  "scripts": {
+    "start": "npm run demo",
+    "build": "(tsc || exit 1) && npx eslint . && npm run copyAssets",
+    "copyAssets": "node scripts/copy-static-assets.js",
+    "dev": "nodemon --exec 'npm run build'  -i dist -i resources -e 'ts html css'",
+    "demo": "node-red -u ./demo --inspect",
+    "test": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhangmx/node-red-contrib-beaver.git"
+  },
+  "keywords": [
+    "node-red",
+    "testing"
+  ],
+  "author": "zhangmx",
+  "license": "Apache-2.0",
+  "node-red": {
+    "version": ">=3.0.0",
+    "plugins": {
+      "beaver": "dist/beaver.js"
+    }
+  },
+  "files": [
+    "dist",
+    "resources"
+  ],
+  "bugs": {
+    "url": "https://github.com/zhangmx/node-red-contrib-beaver/issues"
+  },
+  "homepage": "https://github.com/zhangmx/node-red-contrib-beaver#readme",
+  "devDependencies": {
+    "@types/node": "^18.15.11",
+    "@typescript-eslint/eslint-plugin": "^5.57.1",
+    "@typescript-eslint/parser": "^5.57.1",
+    "eslint": "^8.38.0",
+    "fs-extra": "^11.1.1",
+    "html-minifier": "^4.0.0",
+    "jest": "^29.5.0",
+    "node-red": "^3.0.2",
+    "nodemon": "^2.0.22",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4"
+  },
+  "moduleDirectories": [
+    "node_modules",
+    "src"
+  ],
+  "modulePaths": [
+    "<rootDir>/src/"
+  ],
+  "dependencies": {
+    "should": "^13.2.3"
+  }
+}
