@@ -1,11 +1,14 @@
 import * as Location from "./location"
 import { Breakpoint, PausedEvent, MessageEvent } from "./types"
-import { ReceiveEvent, SendEvent, EventCallback } from "../nr-types"
+// import { ReceiveEvent, SendEvent, EventCallback } from "../nr-types"
+import { EventCallback } from "../nr-types"
 import { MessageQueue } from "./MessageQueue"
 import { EventEmitter } from "events"
 import { NodeAPI } from "node-red";
 
-const DEBUGGER_PAUSED = Symbol("node-red-contrib-beaver: paused");
+import { ReceiveEvent, SendEvent } from "node-red__util";
+
+// const DEBUGGER_PAUSED = Symbol("node-red-contrib-beaver: paused");
 
 type DebuggerConfig = {
     breakpointAction: "pause-all" | "pause-bp"
@@ -15,6 +18,21 @@ interface MessageQueueTable {
 }
 
 let BREAKPOINT_ID = 1;
+
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getProperty(obj: any, prop: any) {
+    Object.defineProperty(obj, prop, {
+        get: function () {
+            return this[prop];
+        },
+        set: function (value) {
+            this[prop] = value;
+        }
+    });
+    return obj[prop];
+}
+
 
 export class Debugger extends EventEmitter {
 
@@ -50,48 +68,73 @@ export class Debugger extends EventEmitter {
     }
 
     private checkLocation(location: Location.Location, event: SendEvent | ReceiveEvent, done: EventCallback) {
-        const breakpointId: string = location.getBreakpointLocation();
-        if (this.isNodePaused(location.id)) {
-            this.queueEvent(location, event, done);
-        } else {
-            if (event.msg && event.msg[DEBUGGER_PAUSED]) {
-                this.pause({
-                    reason: "step",
-                    node: location.id
-                })
-                this.queueEvent(location, event, done);
-            } else {
-                const bp = this.breakpointsByLocation.get(breakpointId);
-                if (bp && bp.active) {
-                    this.pause({
-                        reason: "breakpoint",
-                        node: location.id,
-                        breakpoint: bp.id
-                    })
-                    this.queueEvent(location, event, done);
-                } else {
-                    done();
-                }
-            }
-        }
+        // const breakpointId: string = location.getBreakpointLocation();
+
+        this.queueEvent(location, event, done);
+
+        //TODO what if the node is paused but the breakpoint is not active?
+
+        // if (this.isNodePaused(location.id)) {
+        //     this.queueEvent(location, event, done);
+        // } else {
+        //     if (event.msg && event.msg[DEBUGGER_PAUSED]) {
+        //         this.pause({
+        //             reason: "step",
+        //             node: location.id
+        //         })
+        //         this.queueEvent(location, event, done);
+        //     } else {
+        //         const bp = this.breakpointsByLocation.get(breakpointId);
+        //         if (bp && bp.active) {
+        //             this.pause({
+        //                 reason: "breakpoint",
+        //                 node: location.id,
+        //                 breakpoint: bp.id
+        //             })
+        //             this.queueEvent(location, event, done);
+        //         } else {
+        //             done();
+        //         }
+        //     }
+        // }
     }
 
     enable() {
         this.log("Enabled");
         this.enabled = true;
         this.RED.hooks.add("preRoute.beaver", (sendEvent: SendEvent, done: EventCallback) => {
+            console.log("preRoute beaver", sendEvent.source.node, sendEvent.source.node._flow)
+            console.log(done)
+
             if (isNodeInSubflowModule(sendEvent.source.node)) {
                 // Inside a subflow module - don't pause the event
                 done();
                 return;
             }
-            if (sendEvent.source.node._flow.TYPE !== "flow" && sendEvent.source.node.id === sendEvent.source.node._flow.id) {
-                // This is the subflow output which, in the current implementation
-                // means the message is actually about to be routed to the first node
-                // inside the subflow, not the output of actual subflow.
-                done();
-                return;
+
+            if (sendEvent.source.node._flow) {
+                let _flow_id = "";
+                if (Object.prototype.hasOwnProperty.call(sendEvent.source.node._flow, "id")) {
+                    // get the flow id from _flow with Object.prototype
+
+                    _flow_id = getProperty(sendEvent.source.node._flow, "id");
+                    // _flow_id = sendEvent.source.node._flow["id"];
+                }
+
+                if (
+
+                    sendEvent.source.node._flow.TYPE !== "flow" &&
+                    // sendEvent.source.node._flow.TYPE !== "subflow" &&
+                    sendEvent.source.node.id === _flow_id
+                ) {
+                    // This is the subflow output which, in the current implementation
+                    // means the message is actually about to be routed to the first node
+                    // inside the subflow, not the output of actual subflow.
+                    done();
+                    return;
+                }
             }
+
 
             if (sendEvent.cloneMessage) {
                 sendEvent.msg = this.RED.util.cloneMessage(sendEvent.msg);
@@ -102,6 +145,9 @@ export class Debugger extends EventEmitter {
             this.checkLocation(eventLocation, sendEvent, done);
         });
         this.RED.hooks.add("onReceive.beaver", (receiveEvent: ReceiveEvent, done: EventCallback) => {
+
+            console.log("onReceive beaver", receiveEvent)
+
             if (receiveEvent.destination.node.type === "inject") {
                 // Never pause an Inject node's internal receive event
                 done();
@@ -322,9 +368,9 @@ export class Debugger extends EventEmitter {
                 if (!quiet) {
                     this.emit("messageDispatched", { id: nextEvent.id, location: nextEventLocation, depth: queueDepth })
                 }
-                if (nextEvent.event.msg[DEBUGGER_PAUSED]) {
-                    delete nextEvent.event.msg[DEBUGGER_PAUSED];
-                }
+                // if (nextEvent.event.msg[DEBUGGER_PAUSED]) {
+                //     delete nextEvent.event.msg[DEBUGGER_PAUSED];
+                // }
                 nextEvent.done();
                 this.messageQueue.remove(nextEvent);
             }
@@ -363,6 +409,7 @@ export class Debugger extends EventEmitter {
         return Array.from(this.breakpoints.values());
     }
 
+    // TODO change to start run from a specific node
     step(messageId?: number) {
         if (this.enabled) {
             let nextEvent: MessageEvent | null;
@@ -383,7 +430,7 @@ export class Debugger extends EventEmitter {
                 if (queueDepth === 0) {
                     delete this.queuesByLocation[nextEventLocation]
                 }
-                nextEvent.event.msg[DEBUGGER_PAUSED] = true;
+                // nextEvent.event.msg[DEBUGGER_PAUSED] = true;
                 this.emit("messageDispatched", { id: nextEvent.id, location: nextEventLocation, depth: queueDepth })
                 nextEvent.done();
             }
@@ -411,8 +458,8 @@ export class Debugger extends EventEmitter {
         }
         return changed;
     }
-    
-    
+
+
 
     getState(): object {
         if (!this.enabled) {

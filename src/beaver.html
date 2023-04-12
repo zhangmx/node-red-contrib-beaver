@@ -892,7 +892,19 @@
                     annotatePorts(".red-ui-flow-port-output");
                     annotatePorts(".red-ui-flow-port-input");
                 }
+
+
+                /**
+                 * Creates a port annotation for the given node/port
+                 * 
+                 * 
+                 * @param node
+                 * @param portType
+                 * @param portIndex
+                 * @param portGroup
+                 */
                 function createPortAnnotation(node, portType, portIndex, portGroup) {
+                    //TODO: change to record both input and output ports for a node
                     if ((node.type === "link in" && portType === "input") || (node.type === "link out" && portType === "output")) {
                         return;
                     }
