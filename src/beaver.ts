@@ -1,8 +1,8 @@
-import {Debugger} from "./lib/debugger"
-import {PausedEvent} from "./lib/types"
-import {Location} from "./lib/location"
+import { Debugger } from "./lib/debugger"
+import { PausedEvent } from "./lib/types"
+import { Location } from "./lib/location"
 import { NodeAPI } from "node-red";
-import{Request, Response} from "express";
+import { Request, Response } from "express";
 
 
 
@@ -12,7 +12,7 @@ import{Request, Response} from "express";
 
 // type NodeRed = runtime.RuntimeModule & runtime.InternalRuntimeAPI;
 
-module.exports = (RED:NodeAPI) => {
+module.exports = (RED: NodeAPI) => {
 
     const apiRoot = "/beaver";
 
@@ -25,24 +25,24 @@ module.exports = (RED:NodeAPI) => {
             RED.comms.publish("beaver/connected", true, true);
 
             function publishState() {
-                RED.comms.publish("beaver/state", flowDebugger.getState(),false);
+                RED.comms.publish("beaver/state", flowDebugger.getState(), false);
             }
 
             flowDebugger.on("paused", (event: PausedEvent) => {
-                RED.comms.publish("beaver/paused", event,false);
+                RED.comms.publish("beaver/paused", event, false);
             });
 
             flowDebugger.on("resumed", (event: PausedEvent) => {
-                RED.comms.publish("beaver/resumed", event,false);
+                RED.comms.publish("beaver/resumed", event, false);
             });
             flowDebugger.on("messageQueued", (event) => {
                 // Don't include the full message on the event
                 // event.msg = RED.util.encodeObject({msg:event.msg}, {maxLength: 100});
                 delete event.msg;
-                RED.comms.publish("beaver/messageQueued", event,false);
+                RED.comms.publish("beaver/messageQueued", event, false);
             });
             flowDebugger.on("messageDispatched", (event) => {
-                RED.comms.publish("beaver/messageDispatched", event,false);
+                RED.comms.publish("beaver/messageDispatched", event, false);
             });
             // flowDebugger.on("step", (event) => {
             //
@@ -87,7 +87,11 @@ module.exports = (RED:NodeAPI) => {
             });
             RED.httpAdmin.post(`${apiRoot}/breakpoints`, routeAuthHandler, (req: Request, res: Response) => {
                 // req.body.location
-                const breakpointId = flowDebugger.setBreakpoint(new Location(req.body.id, req.body.path, req.body.portType, req.body.portIndex));
+                console.log(req.body);
+                // TODO save node to recording camera list
+                const breakpointId = flowDebugger.setBreakpoint(
+                    new Location(req.body.id, req.body.path, req.body.portType, req.body.portIndex)
+                );
                 res.json(flowDebugger.getBreakpoint(breakpointId));
             });
             RED.httpAdmin.get(`${apiRoot}/messages`, routeAuthHandler, (_: Request, res: Response) => {

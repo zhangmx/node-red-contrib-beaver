@@ -287,6 +287,7 @@ export class Debugger extends EventEmitter {
 
     pause(event?: PausedEvent) {
         if (this.enabled) {
+            console.log("pause", event)
             let logReason = "manual";
             if (event) {
                 if (event.node) {
