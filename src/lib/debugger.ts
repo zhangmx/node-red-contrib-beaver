@@ -4,8 +4,7 @@ import { Breakpoint, PausedEvent, MessageEvent } from "./types"
 import { EventCallback } from "../nr-types"
 import { MessageQueue } from "./MessageQueue"
 import { EventEmitter } from "events"
-import { NodeAPI } from "node-red";
-
+import { NodeRedApp, NodeAPI } from "node-red";
 import { ReceiveEvent, SendEvent } from "node-red__util";
 
 // const DEBUGGER_PAUSED = Symbol("node-red-contrib-beaver: paused");
@@ -34,8 +33,9 @@ function getProperty(obj: any, prop: any) {
 }
 
 
-export class Debugger extends EventEmitter {
+export class Beaver extends EventEmitter {
 
+    PRIVATERED: NodeRedApp;
     RED: NodeAPI;
     enabled: boolean;
     pausedLocations: Set<string>;
@@ -49,7 +49,7 @@ export class Debugger extends EventEmitter {
     // Events:
     //  paused / resumed
 
-    constructor(RED: NodeAPI) {
+    constructor(RED: NodeAPI, PRIVATERED: NodeRedApp) {
         console.log("Debugger constructor");
         console.log("RED", RED.version());
         // console.log(RED.runtime);
@@ -60,6 +60,7 @@ export class Debugger extends EventEmitter {
             breakpointAction: "pause-all"
         };
         this.RED = RED;
+        this.PRIVATERED = PRIVATERED;
         this.enabled = false;
         this.breakpoints = new Map();
         this.pausedLocations = new Set();

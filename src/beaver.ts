@@ -1,4 +1,4 @@
-import { Debugger } from "./lib/debugger"
+import { Beaver } from "./lib/debugger"
 import { PausedEvent } from "./lib/types"
 import { Location } from "./lib/location"
 import { NodeRedApp, NodeAPI } from "node-red";
@@ -25,7 +25,7 @@ module.exports = (RED: NodeAPI) => {
         onadd: () => {
             console.log("Beaver plugin added");
             // console.log(PRIVATERED.runtime);
-            const flowDebugger = new Debugger(RED);
+            const flowDebugger = new Beaver(RED, PRIVATERED);
             const routeAuthHandler = RED.auth.needsPermission("beaver.write");
 
             RED.comms.publish("beaver/connected", true, true);
