@@ -4,10 +4,11 @@
   "description": "flows recorder for node-red testing",
   "main": "index.js",
   "scripts": {
-    "start": "npm run demo",
+    "start": "npm run svr",
     "build": "(tsc || exit 1) && npx eslint . && npm run copyAssets",
     "copyAssets": "node scripts/copy-static-assets.js",
-    "dev": "nodemon --exec 'npm run build'  -i dist -i resources -e 'ts html css'",
+    "dev": "nodemon --exec 'npm run build'  -i dist -i resources -i demo -e 'ts html css'",
+    "svr": "nodemon --exec 'npm run demo'  -i demo -i src -i tests -e 'js html css'",
     "demo": "node-red -u ./demo --inspect",
     "test": "npm run build"
   },
