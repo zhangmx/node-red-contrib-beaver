@@ -1,4 +1,4 @@
-import { Beaver } from "./lib/debugger"
+import { Beaver } from "./lib/beaver"
 import { PausedEvent } from "./lib/types"
 import { Location } from "./lib/location"
 import { NodeRedApp, NodeAPI } from "node-red";
@@ -26,36 +26,40 @@ module.exports = (RED: NodeAPI) => {
         onadd: () => {
             console.log("Beaver plugin added");
             // console.log(PRIVATERED.runtime);
-            const flowDebugger = new Beaver(RED, PRIVATERED);
+            const flowBeaver = new Beaver(RED, PRIVATERED);
             const routeAuthHandler = RED.auth.needsPermission("beaver.write");
 
             RED.comms.publish("beaver/connected", true, true);
 
             function publishState() {
-                RED.comms.publish("beaver/state", flowDebugger.getState(), false);
+                RED.comms.publish("beaver/state", flowBeaver.getState(), false);
             }
 
-            flowDebugger.on("paused", (event: PausedEvent) => {
+            flowBeaver.on("paused", (event: PausedEvent) => {
                 RED.comms.publish("beaver/paused", event, false);
             });
 
-            flowDebugger.on("resumed", (event: PausedEvent) => {
+            flowBeaver.on("resumed", (event: PausedEvent) => {
                 RED.comms.publish("beaver/resumed", event, false);
             });
-            flowDebugger.on("messageQueued", (event) => {
+
+            flowBeaver.on("messageQueued", (event) => {
                 // Don't include the full message on the event
                 // event.msg = RED.util.encodeObject({msg:event.msg}, {maxLength: 100});
                 delete event.msg;
                 RED.comms.publish("beaver/messageQueued", event, false);
             });
-            flowDebugger.on("messageDispatched", (event) => {
+
+            flowBeaver.on("messageDispatched", (event) => {
                 RED.comms.publish("beaver/messageDispatched", event, false);
             });
-            // flowDebugger.on("step", (event) => {
+
+            // flowBeaver.on("step", (event) => {
             //
             // });
+
             RED.httpAdmin.get(`${apiRoot}`, (_: Request, res: Response) => {
-                res.json(flowDebugger.getState());
+                res.json(flowBeaver.getState());
             });
 
             RED.httpAdmin.put(`${apiRoot}`, routeAuthHandler, (req: Request, res: Response) => {
@@ -63,46 +67,50 @@ module.exports = (RED: NodeAPI) => {
                 // if (req.body.hasOwnProperty("enabled")) {
                 if (Object.prototype.hasOwnProperty.call(req.body, "enabled")) {
                     const enabled = !!req.body.enabled;
-                    if (enabled && !flowDebugger.enabled) {
-                        flowDebugger.enable();
+                    if (enabled && !flowBeaver.enabled) {
+                        flowBeaver.enable();
                         stateChanged = true;
-                    } else if (!enabled && flowDebugger.enabled) {
-                        flowDebugger.disable();
+                    } else if (!enabled && flowBeaver.enabled) {
+                        flowBeaver.disable();
                         stateChanged = true;
                     }
                 }
                 if (Object.prototype.hasOwnProperty.call(req.body, "config")) {
                     // if (req.body.hasOwnProperty("config")) {
-                    stateChanged = flowDebugger.setConfig(req.body.config);
+                    stateChanged = flowBeaver.setConfig(req.body.config);
                 }
                 if (stateChanged) {
                     publishState();
                 }
-                res.json(flowDebugger.getState());
+                res.json(flowBeaver.getState());
+            });
+            // breakpoints
+            RED.httpAdmin.get(`${apiRoot}/breakpoints`, routeAuthHandler, (_: Request, res: Response) => {
+                res.json(flowBeaver.getBreakpoints());
             });
 
-            RED.httpAdmin.get(`${apiRoot}/breakpoints`, routeAuthHandler, (_: Request, res: Response) => {
-                res.json(flowDebugger.getBreakpoints());
-            });
             RED.httpAdmin.put(`${apiRoot}/breakpoints/:id`, routeAuthHandler, (req: Request, res: Response) => {
-                flowDebugger.setBreakpointActive(req.params.id, req.body.active);
-                res.json(flowDebugger.getBreakpoint(req.params.id));
+                flowBeaver.setBreakpointActive(req.params.id, req.body.active);
+                res.json(flowBeaver.getBreakpoint(req.params.id));
             });
+
             RED.httpAdmin.delete(`${apiRoot}/breakpoints/:id`, routeAuthHandler, (req: Request, res: Response) => {
-                flowDebugger.clearBreakpoint(req.params.id);
+                flowBeaver.clearBreakpoint(req.params.id);
                 res.sendStatus(200);
             });
+
             RED.httpAdmin.post(`${apiRoot}/breakpoints`, routeAuthHandler, (req: Request, res: Response) => {
                 // req.body.location
                 console.log(req.body);
                 // TODO save node to recording camera list
-                const breakpointId = flowDebugger.setBreakpoint(
+                const breakpointId = flowBeaver.setBreakpoint(
                     new Location(req.body.id, req.body.path, req.body.portType, req.body.portIndex)
                 );
-                res.json(flowDebugger.getBreakpoint(breakpointId));
+                res.json(flowBeaver.getBreakpoint(breakpointId));
             });
+            // messages
             RED.httpAdmin.get(`${apiRoot}/messages`, routeAuthHandler, (_: Request, res: Response) => {
-                res.json(Array.from(flowDebugger.getMessageQueue()).map(m => {
+                res.json(Array.from(flowBeaver.getMessageQueue()).map(m => {
                     const result = {
                         id: m.id,
                         location: m.location.toString(),
@@ -117,9 +125,10 @@ module.exports = (RED: NodeAPI) => {
                     return result;
                 }));
             });
+
             RED.httpAdmin.get(`${apiRoot}/messages/:id`, routeAuthHandler, (req: Request, res: Response) => {
                 const id = req.params.id;
-                const messageEvent = flowDebugger.getMessageQueue().get(parseInt(id, 10));
+                const messageEvent = flowBeaver.getMessageQueue().get(parseInt(id, 10));
                 if (messageEvent) {
                     const result = {
                         id: messageEvent.id,
@@ -137,25 +146,28 @@ module.exports = (RED: NodeAPI) => {
                     res.sendStatus(404);
                 }
             });
+
             RED.httpAdmin.delete(`${apiRoot}/messages/:id`, routeAuthHandler, (req: Request, res: Response) => {
-                flowDebugger.deleteMessage(parseInt(req.params.id, 10));
+                flowBeaver.deleteMessage(parseInt(req.params.id, 10));
                 res.sendStatus(200);
             });
+
             RED.httpAdmin.post(`${apiRoot}/pause`, routeAuthHandler, (_: Request, res: Response) => {
-                flowDebugger.pause();
+                flowBeaver.pause();
                 res.sendStatus(200);
             });
+
             RED.httpAdmin.post(`${apiRoot}/step`, routeAuthHandler, (req: Request, res: Response) => {
                 let stepMessage = null;
                 if (req.body && req.body.message) {
                     stepMessage = req.body.message;
                 }
-                flowDebugger.step(stepMessage);
+                flowBeaver.step(stepMessage);
                 res.sendStatus(200);
             });
 
             RED.httpAdmin.post(`${apiRoot}/resume`, routeAuthHandler, (_: Request, res: Response) => {
-                flowDebugger.resume();
+                flowBeaver.resume();
                 res.sendStatus(200);
             });
         },

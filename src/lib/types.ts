@@ -1,4 +1,6 @@
-import { ReceiveEvent, SendEvent, EventCallback } from "../nr-types"
+import { EventCallback } from "../nr-types"
+import { ReceiveEvent, SendEvent } from "node-red__util";
+
 import * as Location from "./location"
 
 export interface MessageEvent {
@@ -13,8 +15,8 @@ export interface MessageEvent {
 }
 
 /**
- * Triggered when the debugger is paused
- * @param reason why the debugger paused: 'breakpoint', 'step', 'manual'
+ * Triggered when the beaver is paused
+ * @param reason why the beaver paused: 'breakpoint', 'step', 'manual'
  * @param node the id of the node that is paused
  * @param breakpoint the breakpoint, if any, that triggered the pause
  * @param data any other data associated with the event

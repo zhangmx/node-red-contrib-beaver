@@ -9,7 +9,7 @@ import { ReceiveEvent, SendEvent } from "node-red__util";
 
 // const DEBUGGER_PAUSED = Symbol("node-red-contrib-beaver: paused");
 
-type DebuggerConfig = {
+type BeaverConfig = {
     breakpointAction: "pause-all" | "pause-bp"
 }
 interface MessageQueueTable {
@@ -44,13 +44,13 @@ export class Beaver extends EventEmitter {
     eventNumber: number;
     queuesByLocation: MessageQueueTable;
     messageQueue: MessageQueue;
-    config: DebuggerConfig;
+    config: BeaverConfig;
 
     // Events:
     //  paused / resumed
 
     constructor(RED: NodeAPI, PRIVATERED: NodeRedApp) {
-        console.log("Debugger constructor");
+        console.log("Beaver constructor");
         console.log("RED", RED.version());
         // console.log(RED.runtime);
         console.log("RED", RED.settings.get("editorTheme").testing.enabled);
@@ -461,9 +461,9 @@ export class Beaver extends EventEmitter {
     setConfig(newConfig: object): boolean {
         let changed = false;
         for (const [key, value] of Object.entries(newConfig)) {
-            if (Object.prototype.hasOwnProperty.call(newConfig, key) && this.config[key as keyof DebuggerConfig] !== value) {
+            if (Object.prototype.hasOwnProperty.call(newConfig, key) && this.config[key as keyof BeaverConfig] !== value) {
                 changed = true;
-                this.config[key as keyof DebuggerConfig] = value;
+                this.config[key as keyof BeaverConfig] = value;
             }
         }
         return changed;
@@ -509,7 +509,7 @@ export class Beaver extends EventEmitter {
 
 
     dump(): string {
-        let result = `Debugger State
+        let result = `Beaver State
 ---
 ${this.messageQueue.dump()}
 `;

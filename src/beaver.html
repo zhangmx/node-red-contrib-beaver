@@ -1,7 +1,7 @@
 <link rel="stylesheet" href="resources/node-red-contrib-beaver/style.css">
 <script type="text/javascript">
     (function () {
-        console.log(RED);
+        // console.log(RED);
         if (!RED.view.annotations) {
             RED.notify("Beaver requires Node-RED 3.0.2 or later");
             return;
@@ -16,6 +16,7 @@
 
         RED.plugins.registerPlugin("node-red-contrib-beaver", {
             onadd: function () {
+
                 function parseLocation(location) {
                     var parts = /^(.*?)\/([^\/\[]+)\[(i|o)\]\[(\d+)\]$/.exec(location);
                     var node = RED.nodes.node(parts[2]);
@@ -28,6 +29,7 @@
                         portIndex: parts[4]
                     }
                 }
+
                 function updateQueueDepth(location, depth) {
                     queueDepths[location.id] = queueDepths[location.id] || { input: {}, output: {} }
                     if (queueDepths[location.id][location.portType][location.portIndex] !== depth) {
@@ -57,6 +59,7 @@
                         }
                     }
                 }
+
                 function onNodeChange(node) {
                     if (breakpointsByNode[node.id]) {
                         breakpointsByNode[node.id].forEach(function (bp) {
@@ -75,9 +78,10 @@
                         }
                     }
                     if (pausedLocations.has('*') || pausedLocations.has(node.id)) {
-                        node._debugger_paused = true;
+                        node._beaver_paused = true;
                     }
                 }
+
                 function onNodeRemove(node) {
                     if (breakpointsByNode[node.id]) {
                         breakpointsByNode[node.id].forEach(function (bp) {
@@ -87,6 +91,7 @@
                     delete breakpointsByNode[node.id];
                     delete queueDepths[node.id];
                 }
+
                 function refreshState() {
                     $.ajax({
                         url: "beaver",
@@ -116,22 +121,23 @@
                         }
                     });
                 }
+                
                 function handleStateUpdate(state) {
-                    debuggerState = state;
+                    beaverState = state;
                     pausedLocations = new Set(state.pausedLocations || []);
-                    debuggerState.paused = pausedLocations.size > 0;
+                    beaverState.paused = pausedLocations.size > 0;
 
 
-                    if (debuggerEnabled !== state.enabled) {
+                    if (beaverEnabled !== state.enabled) {
                         handlingCommsEvent = true;
-                        debuggerEnabledToggle.prop("checked", !!state.enabled).trigger("change");
+                        beaverEnabledToggle.prop("checked", !!state.enabled).trigger("change");
                         handlingCommsEvent = false;
                     }
                     if (pausedLocations.size > 0) {
-                        pauseDebugger();
+                        pauseBeaver();
                     } else {
                         if (pausedNotification) {
-                            resumeDebugger();
+                            resumeBeaver();
                         }
                     }
                     if (state.breakpoints) {
@@ -169,7 +175,9 @@
                         }
                     }
                 }
+                
                 function postCommand(cmd, body) {
+                    console.log(cmd, body)
                     var opts = {
                         url: "beaver/" + cmd,
                         type: "POST",
@@ -183,7 +191,8 @@
                     }
                     $.ajax(opts);
                 }
-                var debuggerState;
+
+                var beaverState;
                 var breakpoints = {};
                 var breakpointsByNode = {};
                 var messagesByNode = {};
@@ -192,7 +201,7 @@
                 var queuedMessages = {};
                 var pausedLocations = new Set();
                 var pausedNotification;
-                var debuggerEnabled = false;
+                var beaverEnabled = false;
                 var handlingCommsEvent = false;
 
                 sidebarContent = $("<div>").addClass("red-ui-beaver disabled").css({ "position": "relative", "height": "100%" });
@@ -217,45 +226,45 @@
                 var headerStepControl = $('<span>', { class: "button-group" }).appendTo(headerRightSpan);
 
 
-                var debuggerEnabledToggle = $('<input type="checkbox"/>').appendTo(headerLeftSpan).toggleButton({
+                var beaverEnabledToggle = $('<input type="checkbox"/>').appendTo(headerLeftSpan).toggleButton({
                     enabledIcon: "fa-toggle-on",
                     disabledIcon: "fa-toggle-off",
                     baseClass: "red-ui-sidebar-header-button"
                 }).on("change", function () {
-                    debuggerEnabled = this.checked;
+                    beaverEnabled = this.checked;
                     if (!handlingCommsEvent) {
                         $.ajax({
                             url: "beaver",
                             contentType: "application/json",
                             type: "PUT",
-                            data: JSON.stringify({ enabled: debuggerEnabled }),
+                            data: JSON.stringify({ enabled: beaverEnabled }),
                             success: function (resp) {
-                                sidebarContent.toggleClass("disabled", !debuggerEnabled);
+                                sidebarContent.toggleClass("disabled", !beaverEnabled);
                             },
                             error: function (jqXHR, textStatus, errorThrown) {
                                 console.log(jqXHR, textStatus, errorThrown);
                             }
                         });
                     } else {
-                        sidebarContent.toggleClass("disabled", !debuggerEnabled);
+                        sidebarContent.toggleClass("disabled", !beaverEnabled);
                     }
-                    if (debuggerEnabled) {
-                        enableDebugger();
+                    if (beaverEnabled) {
+                        enableBeaver();
                     } else {
-                        disableDebugger()
+                        disableBeaver()
                     }
 
                 });
 
                 var playPauseButton = $('<button type="button" class="red-ui-sidebar-header-button red-ui-beaver-btn-pauseresume"><i class="fa fa-pause"/></button>').appendTo(headerPlayControl).on("click", function (evt) {
-                    if (debuggerState.paused) {
+                    if (beaverState.paused) {
                         postCommand("resume");
                     } else {
                         postCommand("pause")
                     }
                 });
                 RED.popover.tooltip(playPauseButton, function () {
-                    return RED._("node-red-contrib-beaver/beaver:label." + (debuggerState.paused ? "resume" : "pause"))
+                    return RED._("node-red-contrib-beaver/beaver:label." + (beaverState.paused ? "resume" : "pause"))
                 });
 
                 var stepButton = $('<button type="button" disabled class="red-ui-sidebar-header-button red-ui-beaver-btn-step"><i class="fa fa-step-forward"/></button>').appendTo(headerPlayControl).on("click", function (evt) {
@@ -271,7 +280,7 @@
                     evt.stopPropagation();
                     if (!settingsPanelOpen) {
                         settingsButton.find("i").removeClass("fa-cog").addClass("fa-close");
-                        var breakpointAction = debuggerState.config.breakpointAction || "pause-all";
+                        var breakpointAction = beaverState.config.breakpointAction || "pause-all";
                         settingsPanel.find('input[value="' + breakpointAction + '"]').attr("checked", true);
                         // settingsPanelPopover.container.width(breakpointSection.header.width()+20);
                         settingsPanelPopover.show({
@@ -664,7 +673,7 @@
 
                 var updateMessageListTimer;
                 function updateMessageList() {
-                    if (!debuggerEnabled) {
+                    if (!beaverEnabled) {
                         return;
                     }
                     if (!updateMessageListTimer) {
@@ -733,7 +742,7 @@
                     });
                     debugMessage.appendTo(el);
                 }
-                function pauseDebugger() {
+                function pauseBeaver() {
                     $("#red-ui-workspace").addClass("red-ui-beaver-paused");
                     $(".red-ui-beaver-btn-pauseresume i").removeClass("fa-pause").addClass("fa-play");
                     $(".red-ui-beaver-btn-step").prop("disabled", null);
@@ -757,11 +766,11 @@
                     }
                     var allPaused = pausedLocations.has("*");
                     RED.nodes.eachNode(function (n) {
-                        n._debugger_paused = allPaused || pausedLocations.has(n.id);
+                        n._beaver_paused = allPaused || pausedLocations.has(n.id);
                     })
                     RED.view.redraw();
                 }
-                function resumeDebugger() {
+                function resumeBeaver() {
                     if (pausedNotification) {
                         pausedNotification.close();
                         pausedNotification = null;
@@ -769,8 +778,8 @@
                     pausedLocations.clear();
                     $(".red-ui-beaver-btn-pauseresume i").removeClass("fa-play").addClass("fa-pause");
                     $(".red-ui-beaver-btn-step").prop("disabled", true);
-                    debuggerState.paused = false;
-                    RED.nodes.eachNode(function (n) { delete n._debugger_paused })
+                    beaverState.paused = false;
+                    RED.nodes.eachNode(function (n) { delete n._beaver_paused })
                     RED.view.redraw();
                 }
                 RED.events.on("nodes:add", onNodeChange);
@@ -795,10 +804,10 @@
                         pausedLocations.clear();
                         pausedLocations.add("*");
                     }
-                    debuggerState.paused = pausedLocations.size > 0;
-                    pauseDebugger();
+                    beaverState.paused = pausedLocations.size > 0;
+                    pauseBeaver();
                 })
-                RED.comms.subscribe("beaver/resumed", resumeDebugger);
+                RED.comms.subscribe("beaver/resumed", resumeBeaver);
                 RED.comms.subscribe("beaver/messageQueued", function (topic, msg) {
                     msg.location = parseLocation(msg.location);
                     updateQueueDepth(msg.location, msg.depth);
@@ -819,18 +828,18 @@
                 })
 
 
-                RED.actions.add("beaver:show-debugger-tab", show);
+                RED.actions.add("beaver:show-beaver-tab", show);
                 RED.actions.add("beaver:pause-flows", function () { postCommand('pause') });
                 RED.actions.add("beaver:resume-flows", function () { postCommand('resume') });
                 RED.actions.add("beaver:step-flows", function () { postCommand('step') });
-                RED.actions.add("beaver:enable-debugger", function () {
-                    debuggerEnabledToggle.prop("checked", true).trigger("change");
+                RED.actions.add("beaver:enable-beaver", function () {
+                    beaverEnabledToggle.prop("checked", true).trigger("change");
                 });
-                RED.actions.add("beaver:disable-debugger", function () {
-                    debuggerEnabledToggle.prop("checked", false).trigger("change");
+                RED.actions.add("beaver:disable-beaver", function () {
+                    beaverEnabledToggle.prop("checked", false).trigger("change");
                 });
 
-                function disableDebugger() {
+                function disableBeaver() {
                     breakpointList.editableList('empty');
                     messageList.editableList('empty');
                     RED.hooks.remove("*.beaver");
@@ -848,7 +857,7 @@
 
                     RED.view.annotations.unregister("red-ui-beaver-paused")
                 }
-                function enableDebugger() {
+                function enableBeaver() {
                     RED.hooks.add("viewAddPort.beaver", function (evt) {
                         createPortAnnotation(evt.node, evt.portType, evt.portIndex, evt.port)
                     })
@@ -862,7 +871,7 @@
                     RED.view.annotations.register("red-ui-beaver-paused", {
                         type: "badge",
                         class: "red-ui-beaver-annotation-paused",
-                        show: "_debugger_paused",
+                        show: "_beaver_paused",
                         element: function () {
                             var buttonGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
                             buttonGroup.setAttribute("transform", "translate(0,-2)")
