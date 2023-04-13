@@ -5,6 +5,7 @@ import { NodeRedApp, NodeAPI } from "node-red";
 import { Request, Response } from "express";
 
 // NOTE(alonam) a little trick to require the same "node-red" API to give private access to our own modulesContext.
+// from https://gitlab.com/monogoto.io/node-red-contrib-flow-manager
 const PRIVATERED: NodeRedApp = (function requireExistingNoderedInstance() {
     if (require.main) {
         for (const child of require.main.children) {
