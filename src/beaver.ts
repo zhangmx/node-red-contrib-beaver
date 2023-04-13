@@ -1,16 +1,21 @@
 import { Debugger } from "./lib/debugger"
 import { PausedEvent } from "./lib/types"
 import { Location } from "./lib/location"
-import { NodeAPI } from "node-red";
+import { NodeRedApp, NodeAPI } from "node-red";
 import { Request, Response } from "express";
 
-
-
-// import * as runtime from '@node-red/runtime';
-// import * as red from "node-red"
-// import { Node as NRNode, NodeProperties, Red } from "node-red";
-
-// type NodeRed = runtime.RuntimeModule & runtime.InternalRuntimeAPI;
+// NOTE(alonam) a little trick to require the same "node-red" API to give private access to our own modulesContext.
+const PRIVATERED: NodeRedApp = (function requireExistingNoderedInstance() {
+    if (require.main) {
+        for (const child of require.main.children) {
+            if (child.filename.endsWith('red.js')) {
+                return require(child.filename);
+            }
+        }
+    }
+    // In case node-red was not required before, just require it
+    return require('node-red');
+})();
 
 module.exports = (RED: NodeAPI) => {
 
@@ -18,7 +23,8 @@ module.exports = (RED: NodeAPI) => {
 
     RED.plugins.registerPlugin("node-red-contrib-beaver", {
         onadd: () => {
-
+            console.log("Beaver plugin added");
+            // console.log(PRIVATERED.runtime);
             const flowDebugger = new Debugger(RED);
             const routeAuthHandler = RED.auth.needsPermission("beaver.write");
 

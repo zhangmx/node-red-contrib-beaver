@@ -50,6 +50,11 @@ export class Debugger extends EventEmitter {
     //  paused / resumed
 
     constructor(RED: NodeAPI) {
+        console.log("Debugger constructor");
+        console.log("RED", RED.version());
+        // console.log(RED.runtime);
+        console.log("RED", RED.settings.get("editorTheme").testing.enabled);
+
         super();
         this.config = {
             breakpointAction: "pause-all"
@@ -69,6 +74,8 @@ export class Debugger extends EventEmitter {
 
     private checkLocation(location: Location.Location, event: SendEvent | ReceiveEvent, done: EventCallback) {
         // const breakpointId: string = location.getBreakpointLocation();
+
+        this.RED
 
         this.queueEvent(location, event, done);
 
@@ -147,6 +154,7 @@ export class Debugger extends EventEmitter {
         this.RED.hooks.add("onReceive.beaver", (receiveEvent: ReceiveEvent, done: EventCallback) => {
 
             console.log("onReceive beaver", receiveEvent)
+            console.log(done)
 
             if (receiveEvent.destination.node.type === "inject") {
                 // Never pause an Inject node's internal receive event
