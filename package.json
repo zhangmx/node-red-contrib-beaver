@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "npm run svr",
+    "build2": "(tsc || exit 1)",
     "build": "(tsc || exit 1) && npx eslint . && npm run copyAssets",
     "copyAssets": "node scripts/copy-static-assets.js",
     "dev": "nodemon --exec 'npm run build'  -i dist -i resources -i demo -e 'ts html css'",

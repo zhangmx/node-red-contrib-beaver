@@ -14,25 +14,33 @@ assets[dist] = [
     "locales"
 ]
 assets[resources] = [
-    "style.css"
+    "style.css",
+    "beaver_ui.js"
 ]
 
-async function copyStaticAssets(dist, assets) {
-    await fs.mkdir(dist, { recursive: true });
+async function copyStaticAssets(destination, assets) {
+    console.log(destination)
+    console.log(assets)
+
+    await fs.mkdir(destination, { recursive: true });
     for (let i = 0; i < assets.length; i++) {
         if (/\.html/.test(assets[i])) {
             const content = await fs.readFile(path.join(src, assets[i]), "utf-8")
-            await fs.writeFile(path.join(dist, assets[i]), minify(content, { minifyCSS: false, minifyJS: false }))
+            await fs.writeFile(path.join(destination, assets[i]), minify(content, { minifyCSS: false, minifyJS: false }))
         } else if (/\.js/.test(assets[i])) {
-            await fs.copy(path.join(src, assets[i]), path.join(dist, assets[i]))
+            // there is no js file now
+            // await fs.copy(path.join(src, assets[i]), path.join(distination, assets[i]))
+            // 
+            await fs.copy(path.join(dist, assets[i]), path.join(destination, assets[i]))
+
         } else if (/\.css/.test(assets[i])) {
             const rawCSS = await fs.readFile(path.join(src, assets[i]), "utf-8");
             const minifiedCSS = minify("<style>" + rawCSS + "</style>", { minifyCSS: false });
             const finalCSS = minifiedCSS.substring(7, minifiedCSS.length - 8)
-            await fs.writeFile(path.join(dist, assets[i]), finalCSS)
+            await fs.writeFile(path.join(destination, assets[i]), finalCSS)
         } else {
-            await fs.mkdir(path.join(dist, assets[i]), { recursive: true });
-            await fs.copy(path.join(src, assets[i]), path.join(dist, assets[i]))
+            await fs.mkdir(path.join(destination, assets[i]), { recursive: true });
+            await fs.copy(path.join(src, assets[i]), path.join(destination, assets[i]))
         }
     }
 }
