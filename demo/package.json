@@ -4,6 +4,6 @@
     "version": "0.0.1",
     "private": true,
     "dependencies": {
-        "red-contrib-beaver": "file:.."
+        "node-red-contrib-beaver": "file:.."
     }
 }

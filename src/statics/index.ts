@@ -1,15 +1,10 @@
-import { RED as REDinHtml} from "node-red__editor-client";
-// declare const $: JQueryStatic;
+import { RED as REDinHtml } from "node-red__editor-client";
 
-// declare const $: {
-//     <T extends HTMLElement>(element: T): JQuery<T>
-// }
-
-declare const RED: REDinHtml; 
-// type JQuery<HTMLElement> = HTMLElement
+// if there is no RED(type: REDinHtml) object then give default value
+declare const RED: REDinHtml;
 (function () {
     console.log(RED.nodes.version())
-    if (!Object.prototype.hasOwnProperty.call(RED.view,'annotations')) {
+    if (!Object.prototype.hasOwnProperty.call(RED.view, 'annotations')) {
         RED.notify("Beaver requires Node-RED 3.0.2 or later");
         return;
     }
@@ -57,9 +52,9 @@ declare const RED: REDinHtml;
                 action: "core:show-beaver-tab"
             });
 
-            const header: JQuery = $("<div>", { class: "red-ui-sidebar-header" }).appendTo(sidebarContent);
+            // const header: JQuery = $("<div>", { class: "red-ui-sidebar-header" }).appendTo(sidebarContent);
 
-            const headerLeftSpan: JQuery = $('<span>').css({ "flex-grow": 1, "text-align": "left" }).appendTo(header);
+            // const headerLeftSpan: JQuery = $('<span>').css({ "flex-grow": 1, "text-align": "left" }).appendTo(header);
 
             // const beaverEnabledToggle: JQuery = $('<input type="checkbox"/>').appendTo(headerLeftSpan).toggleButton({
             //     enabledIcon: "fa-toggle-on",
@@ -128,7 +123,7 @@ declare const RED: REDinHtml;
             });
 
 
-            RED.comms.subscribe("beaver/connected", function (topic, msg) {
+            RED.comms.subscribe("beaver/connected", function (_topic, _msg) {
                 return;
             });
 
