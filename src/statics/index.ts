@@ -39,7 +39,7 @@ declare const RED: REDinHtml;
             // let handlingCommsEvent = false;
 
             sidebarContent = $("<div>").addClass("red-ui-beaver disabled").css({ "position": "relative", "height": "100%" });
-            const footerToolbar: JQuery = $('<div></div>');
+            const footerToolbar: JQuery = $('<div>TODO add test case list</div>');
 
             RED.sidebar.addTab({
                 id: "beaver",

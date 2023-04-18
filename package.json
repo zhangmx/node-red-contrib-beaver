@@ -36,7 +36,7 @@
   ],
   "scripts": {
     "start": "npm run svr",
-    "build": "npm run clean && npx eslint . && npm run statics && npm run plugin && npm run copyfiles",
+    "build": "npx eslint . && npm run statics && npm run plugin && npm run copyfiles",
     "clean": "rimraf dist/ && rimraf resources/",
     "copyfiles": "npm run copy-html && npm run copy-css && npm run copy-locales",
     "copy-html": "copyfiles -f src/plugin/index.html dist",
@@ -44,7 +44,7 @@
     "copy-css": "copyfiles -f src/statics/style.css resources",
     "statics": "tsc -p src/statics",
     "plugin": "tsc -p src/plugin",
-    "dev": "nodemon --exec 'npm run build'  -i dist -i resources -i demo -e 'ts html css'",
+    "dev": "nodemon --exec 'npm run build' -w src -i tests -i dist -i resources -i demo -e 'ts html css'",
     "svr": "nodemon --exec 'npm run demo'  -i demo -i src -i tests -e 'js html css'",
     "demo": "node-red -u ./demo --inspect",
     "test": "echo \"Error: no test specified\" && exit 1"

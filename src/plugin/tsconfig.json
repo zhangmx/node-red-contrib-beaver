@@ -6,19 +6,9 @@
         "outDir": "../../dist",
         "allowJs": true,
         "checkJs": true,
-        "strict": true,
-        "noImplicitAny": true,
-        "noImplicitThis": true,
-        "noImplicitReturns": true,
-        "noUnusedLocals": true,
-        "noUnusedParameters": true
-    },
-    "composite": true ,
-    "paths": {
-        "jsonata": ["node_modules/jsonata"] 
+        "strict": true
     },
     "include": [
-        "./index.ts",
-        "./index.html"
+        "./index.ts"
     ]
 }
