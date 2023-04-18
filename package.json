@@ -44,8 +44,8 @@
     "copy-css": "copyfiles -f src/statics/style.css resources",
     "statics": "tsc -p src/statics",
     "plugin": "tsc -p src/plugin",
-    "dev": "nodemon --exec 'npm run build' -w src -i tests -i dist -i resources -i demo -e 'ts html css'",
-    "svr": "nodemon --exec 'npm run demo'  -i demo -i src -i tests -e 'js html css'",
+    "dev": "nodemon --exec 'npm run build' -w src -i tests -i dist -i resources -i demo -i examples -e 'ts html css'",
+    "svr": "nodemon --exec 'npm run demo'  -i demo -i src -i tests -i examples -e 'js html css'",
     "demo": "node-red -u ./demo --inspect",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
