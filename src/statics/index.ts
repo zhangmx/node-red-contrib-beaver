@@ -1,4 +1,4 @@
-import { RED as REDinHtml } from "node-red__editor-client";
+import { RED as REDinHtml, NodeInstance } from "node-red__editor-client";
 
 // if there is no RED(type: REDinHtml) object then give default value
 declare const RED: REDinHtml;
@@ -20,6 +20,27 @@ function postCommand(cmd: string, body?: any) {
     $.ajax(opts);
 }
 
+function parseLocation(location: string) {
+    const parts = /^(.*?)\/([^/[]+)\[(i|o)\]\[(\d+)\]$/.exec(location);
+
+    if (!parts) {
+        return null;
+    }
+    const node = RED.nodes.node(parts[2]) as NodeInstance;
+    return {
+        location: location,
+        z: node ? node.z : null,
+        path: parts[1],
+        id: parts[2],
+        portType: parts[3] === 'i' ? "input" : "output",
+        portIndex: parts[4]
+    }
+}
+
+
+// function show() {
+//     RED.sidebar.show("beaver");
+// }
 
 (function () {
     console.log(RED);
@@ -31,21 +52,32 @@ function postCommand(cmd: string, body?: any) {
         RED.notify("Beaver requires Node-RED 3.0.2 or later");
         return;
     }
-    // const MAX_MESSAGE_LOADED = 10;
-    let sidebarContent: JQuery;
-    // let activeMessageFilter: string = 'all';
+
+    let sidebarContent: JQuery<HTMLElement>;
+
+    const MAX_MESSAGE_LOADED = 10;
+    const activeMessageFilter = 'all';
 
     RED.plugins.registerPlugin("node-red-contrib-beaver", {
         onadd: function () {
 
             console.log("Beaver plugin added");
-            // let beaverState: any;
+            // let beaverState;
+            // let breakpoints = {};
+            // let breakpointsByNode = {};
+            // let messagesByNode = {};
+            // let annotations = {};
+            // let queueDepths = {};
+            // let queuedMessages = {};
+            // let pausedLocations = new Set();
+            // let pausedNotification;
+            let beaverEnabled = false;
+            let handlingCommsEvent = false;
 
-            // let beaverEnabled = false;
-            // let handlingCommsEvent = false;
-
-            sidebarContent = $("<div>").addClass("red-ui-beaver disabled").css({ "position": "relative", "height": "100%" });
-            const footerToolbar: JQuery = $('<div>TODO add test case list</div>');
+            sidebarContent = $("<div>")
+                .addClass("red-ui-beaver disabled")
+                .css({ "position": "relative", "height": "100%" }) ;
+            const footerToolbar = $('<div>TODO add test case list</div>') as unknown as HTMLElement;
 
             RED.sidebar.addTab({
                 id: "beaver",
@@ -53,40 +85,49 @@ function postCommand(cmd: string, body?: any) {
                 name: RED._("node-red-contrib-beaver/beaver:label.beaver"),
                 iconClass: "fa fa-paw",
                 content: sidebarContent as unknown as HTMLElement,
-                toolbar: footerToolbar as unknown as HTMLElement,
+                toolbar: footerToolbar,
                 enableOnEdit: true,
                 action: "core:show-beaver-tab"
             });
 
-            // const header: JQuery = $("<div>", { class: "red-ui-sidebar-header" }).appendTo(sidebarContent);
+            const header = $("<div>", { class: "red-ui-sidebar-header" }).appendTo(sidebarContent) as unknown as HTMLElement;
 
-            // const headerLeftSpan: JQuery = $('<span>').css({ "flex-grow": 1, "text-align": "left" }).appendTo(header);
+            const headerLeftSpan = $('<span>').css({ "flex-grow": 1, "text-align": "left" }).appendTo(header) as unknown as HTMLElement;
+            const headerRightSpan = $('<span>', { class: "red-ui-beaver-toolbar" }).appendTo(header) as unknown as HTMLElement;
+            const headerPlayControl = $('<span>', { class: "button-group" }).appendTo(headerRightSpan) as unknown as HTMLElement;
+            const headerStepControl = $('<span>', { class: "button-group" }).appendTo(headerRightSpan) as unknown as HTMLElement;
 
-            // const beaverEnabledToggle: JQuery = $('<input type="checkbox"/>').appendTo(headerLeftSpan).toggleButton({
-            //     enabledIcon: "fa-toggle-on",
-            //     disabledIcon: "fa-toggle-off",
-            //     baseClass: "red-ui-sidebar-header-button"
-            // }).on("change", function () {
-            //     beaverEnabled = this.checked;
-            //     if (!handlingCommsEvent) {
-            //         $.ajax({
-            //             url: "beaver",
-            //             contentType: "application/json",
-            //             type: "PUT",
-            //             data: JSON.stringify({ enabled: beaverEnabled }),
-            //             success: function (resp) {
-            //                 sidebarContent.toggleClass("disabled", !beaverEnabled);
-            //             },
-            //             error: function (jqXHR, textStatus, errorThrown) {
-            //                 console.log(jqXHR, textStatus, errorThrown);
-            //             }
-            //         });
-            //     } else {
-            //         sidebarContent.toggleClass("disabled", !beaverEnabled);
-            //     }
+            const beaverEnabledToggle = ($('<input type="checkbox"/>')
+                .appendTo(headerLeftSpan)  as JQuery<HTMLButtonElement>).toggleButton({
+                // .toggleButton({
+                //     enabledIcon: "fa-toggle-on",
+                //     disabledIcon: "fa-toggle-off",
+                //     baseClass: "red-ui-sidebar-header-button"
+                // }).on("change", function () {
+                //     beaverEnabled = this.checked;
+                //     if (!handlingCommsEvent) {
+                //         $.ajax({
+                //             url: "beaver",
+                //             contentType: "application/json",
+                //             type: "PUT",
+                //             data: JSON.stringify({ enabled: beaverEnabled }),
+                //             success: function (resp) {
+                //                 sidebarContent.toggleClass("disabled", !beaverEnabled);
+                //             },
+                //             error: function (jqXHR, textStatus, errorThrown) {
+                //                 console.log(jqXHR, textStatus, errorThrown);
+                //             }
+                //         });
+                //     } else {
+                //         sidebarContent.toggleClass("disabled", !beaverEnabled);
+                //     }
+                //     if (beaverEnabled) {
+                //         enableBeaver();
+                //     } else {
+                //         disableBeaver()
+                //     }
 
-
-            // });
+                // });
 
             // const settingsPanel: JQuery = $('<div class="red-ui-beaver-settings"></div>').css({ padding: "8px" });
             // $('<div data-i18n="node-red-contrib-beaver/beaver:label.breakpointAction.label"></div>').appendTo(settingsPanel);
@@ -143,4 +184,4 @@ function postCommand(cmd: string, body?: any) {
     })
 })();
 
-export {postCommand};
+export { postCommand };
