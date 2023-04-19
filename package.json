@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "flows recorder for node-red testing",
   "main": "index.js",
+  "bin": {
+    "beaver": "bin/beaver.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zhangmx/node-red-contrib-beaver.git"

@@ -2,8 +2,31 @@ import { RED as REDinHtml } from "node-red__editor-client";
 
 // if there is no RED(type: REDinHtml) object then give default value
 declare const RED: REDinHtml;
+
+
+function postCommand(cmd: string, body?: any) {
+    console.log(cmd, body)
+    const opts: JQuery.AjaxSettings = {
+        url: "beaver/" + cmd,
+        type: "POST",
+        error: function (jqXHR, textStatus, errorThrown) {
+            console.log(jqXHR, textStatus, errorThrown);
+        }
+    }
+    if (body) {
+        opts.contentType = "application/json";
+        opts.data = JSON.stringify(body);
+    }
+    $.ajax(opts);
+}
+
+
 (function () {
-    console.log(RED.nodes.version())
+    console.log(RED);
+    console.log(RED.settings)
+    console.log(RED.settings.editorTheme)
+
+    // console.log(RED.nodes.version())
     if (!Object.prototype.hasOwnProperty.call(RED.view, 'annotations')) {
         RED.notify("Beaver requires Node-RED 3.0.2 or later");
         return;
@@ -16,23 +39,6 @@ declare const RED: REDinHtml;
         onadd: function () {
 
             console.log("Beaver plugin added");
-
-            function postCommand(cmd: string, body?: any) {
-                console.log(cmd, body)
-                const opts: JQuery.AjaxSettings = {
-                    url: "beaver/" + cmd,
-                    type: "POST",
-                    error: function (jqXHR, textStatus, errorThrown) {
-                        console.log(jqXHR, textStatus, errorThrown);
-                    }
-                }
-                if (body) {
-                    opts.contentType = "application/json";
-                    opts.data = JSON.stringify(body);
-                }
-                $.ajax(opts);
-            }
-
             // let beaverState: any;
 
             // let beaverEnabled = false;
@@ -136,3 +142,5 @@ declare const RED: REDinHtml;
         }
     })
 })();
+
+export {postCommand};

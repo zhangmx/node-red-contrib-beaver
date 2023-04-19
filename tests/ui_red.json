@@ -1,0 +1,233 @@
+{
+    "loader": {},
+    "events": {},
+    "hooks": {},
+    "i18n": {},
+    "settings": {
+        "apiRootUrl": "",
+        "httpNodeRoot": "/",
+        "version": "3.0.2-git",
+        "context": {
+            "default": "memory",
+            "stores": [
+                "memory"
+            ]
+        },
+        "codeEditor": {
+            "lib": "monaco",
+            "options": {}
+        },
+        "libraries": [
+            {
+                "id": "local",
+                "label": "editor:library.types.local",
+                "user": false,
+                "icon": "font-awesome/fa-hdd-o"
+            },
+            {
+                "id": "examples",
+                "label": "editor:library.types.examples",
+                "user": false,
+                "icon": "font-awesome/fa-life-ring",
+                "types": [
+                    "flows"
+                ],
+                "readOnly": true
+            }
+        ],
+        "flowFilePretty": true,
+        "externalModules": {},
+        "flowEncryptionType": "system",
+        "diagnostics": {
+            "enabled": true,
+            "ui": true
+        },
+        "runtimeState": {
+            "enabled": false,
+            "ui": false
+        },
+        "functionExternalModules": true,
+        "tlsConfigDisableLocalFiles": false,
+        "editorTheme": {
+            "palette": {},
+            "projects": {
+                "enabled": false,
+                "workflow": {
+                    "mode": "manual"
+                }
+            },
+            "languages": [
+                "de",
+                "en-US",
+                "ja",
+                "ko",
+                "ru",
+                "zh-CN",
+                "zh-TW"
+            ],
+            "themes": []
+        }
+    },
+    "user": {},
+    "comms": {},
+    "runtime": {
+        "started": true
+    },
+    "text": {
+        "bidi": {},
+        "format": {}
+    },
+    "state": {
+        "DEFAULT": 0,
+        "MOVING": 1,
+        "JOINING": 2,
+        "MOVING_ACTIVE": 3,
+        "ADDING": 4,
+        "EDITING": 5,
+        "EXPORT": 6,
+        "IMPORT": 7,
+        "IMPORT_DRAGGING": 8,
+        "QUICK_JOINING": 9,
+        "PANNING": 10,
+        "SELECTING_NODE": 11,
+        "GROUP_DRAGGING": 12,
+        "GROUP_RESIZE": 13,
+        "DETACHED_DRAGGING": 14,
+        "SLICING": 15,
+        "SLICING_JUNCTION": 16
+    },
+    "plugins": {},
+    "nodes": {
+        "registry": {},
+        "fontAwesome": {}
+    },
+    "history": {},
+    "validators": {},
+    "utils": {},
+    "menu": {},
+    "panels": {},
+    "popover": {},
+    "tabs": {},
+    "stack": {},
+    "actions": {},
+    "deploy": {},
+    "diagnostics": {},
+    "diff": {},
+    "keyboard": {},
+    "workspaces": {},
+    "statusBar": {},
+    "view": {
+        "node_width": 100,
+        "node_height": 30,
+        "snapGrid": true,
+        "annotations": {},
+        "navigator": {},
+        "tools": {}
+    },
+    "sidebar": {
+        "info": {
+            "outliner": {}
+        },
+        "help": {},
+        "config": {},
+        "context": {},
+        "versionControl": {}
+    },
+    "palette": {
+        "editor": {}
+    },
+    "editor": {
+        "customEditTypes": {
+            "_buffer": {},
+            "_expression": {},
+            "_js": {},
+            "_json": {},
+            "_markdown": {},
+            "_text": {}
+        },
+        "codeEditor": {
+            "settings": {
+                "lib": "monaco",
+                "options": {}
+            },
+            "editor": {
+                "type": "monaco",
+                "initialised": true
+            },
+            "ace": {
+                "type": "ace",
+                "initialised": false
+            },
+            "monaco": {
+                "type": "monaco",
+                "initialised": true
+            }
+        },
+        "colorPicker": {},
+        "envVarList": {
+            "DEFAULT_ENV_TYPE_LIST": [
+                "str",
+                "num",
+                "bool",
+                "json",
+                "bin",
+                "env"
+            ],
+            "DEFAULT_ENV_TYPE_LIST_INC_CRED": [
+                "str",
+                "num",
+                "bool",
+                "json",
+                "bin",
+                "env",
+                "cred"
+            ]
+        },
+        "iconPicker": {}
+    },
+    "colorPicker": {},
+    "eventLog": {},
+    "tray": {},
+    "clipboard": {},
+    "library": {},
+    "notifications": {},
+    "search": {},
+    "contextMenu": {},
+    "actionList": {},
+    "typeSearch": {},
+    "subflow": {},
+    "group": {
+        "def": {
+            "defaults": {
+                "name": {
+                    "value": ""
+                },
+                "style": {
+                    "value": {
+                        "label": true
+                    }
+                },
+                "nodes": {
+                    "value": []
+                },
+                "env": {
+                    "value": []
+                }
+            },
+            "category": "config",
+            "set": {
+                "module": "node-red"
+            }
+        }
+    },
+    "userSettings": {},
+    "projects": {
+        "settings": {},
+        "userSettings": {}
+    },
+    "touch": {
+        "radialMenu": {}
+    },
+    "tourGuide": {},
+    "debug": {}
+}

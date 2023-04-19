@@ -3,12 +3,12 @@
         "target": "es6",
         "module": "commonjs",
         "moduleResolution": "nodenext",
-        "outDir": "../../cli",
+        "outDir": "../../bin",
         "allowJs": true,
         "checkJs": true,
         "strict": true
     },
     "include": [
-        "./index.ts"
+        "./beaver.ts"
     ]
 }

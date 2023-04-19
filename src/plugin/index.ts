@@ -18,6 +18,10 @@ const PRIVATERED: NodeRedApp = (function requireExistingNoderedInstance() {
     return require('node-red');
 })();
 
+
+//TODO postinstall script to create folders and npm scripts
+
+
 module.exports = (RED: NodeAPI) => {
 
     const apiRoot = "/beaver";
