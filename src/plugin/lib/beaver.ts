@@ -1,13 +1,13 @@
 import * as Location from "./location"
 import { Breakpoint, PausedEvent, MessageEvent } from "./types"
-// import { ReceiveEvent, SendEvent, EventCallback } from "../nr-types"
-import { EventCallback } from "../nr-types"
+import { ReceiveEvent, SendEvent, EventCallback } from "../nr-types"
+// import { EventCallback } from "../nr-types"
+// import { ReceiveEvent, SendEvent } from "node-red__util";
 import { MessageQueue } from "./MessageQueue"
 import { EventEmitter } from "events"
 import { NodeRedApp, NodeAPI } from "node-red";
-import { ReceiveEvent, SendEvent } from "node-red__util";
 
-// const DEBUGGER_PAUSED = Symbol("node-red-contrib-beaver: paused");
+const DEBUGGER_PAUSED = Symbol("node-red-contrib-beaver: paused");
 
 type BeaverConfig = {
     breakpointAction: "pause-all" | "pause-bp"
@@ -20,17 +20,18 @@ let BREAKPOINT_ID = 1;
 
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getProperty(obj: any, prop: any) {
-    Object.defineProperty(obj, prop, {
-        get: function () {
-            return this[prop];
-        },
-        set: function (value) {
-            this[prop] = value;
-        }
-    });
-    return obj[prop];
-}
+// function getProperty(obj: any, prop: any) {
+//     RangeError: Maximum call stack size exceeded
+//     Object.defineProperty(obj, prop, {
+//         get: function () {
+//             return this[prop];
+//         },
+//         set: function (value) {
+//             this[prop] = value;
+//         }
+//     });
+//     return obj[prop];
+// }
 
 
 export class Beaver extends EventEmitter {
@@ -74,7 +75,7 @@ export class Beaver extends EventEmitter {
     }
 
     private checkLocation(location: Location.Location, event: SendEvent | ReceiveEvent, done: EventCallback) {
-        // const breakpointId: string = location.getBreakpointLocation();
+        const breakpointId: string = location.getBreakpointLocation();
 
         this.RED
 
@@ -82,37 +83,38 @@ export class Beaver extends EventEmitter {
 
         //TODO what if the node is paused but the breakpoint is not active?
 
-        // if (this.isNodePaused(location.id)) {
-        //     this.queueEvent(location, event, done);
-        // } else {
-        //     if (event.msg && event.msg[DEBUGGER_PAUSED]) {
-        //         this.pause({
-        //             reason: "step",
-        //             node: location.id
-        //         })
-        //         this.queueEvent(location, event, done);
-        //     } else {
-        //         const bp = this.breakpointsByLocation.get(breakpointId);
-        //         if (bp && bp.active) {
-        //             this.pause({
-        //                 reason: "breakpoint",
-        //                 node: location.id,
-        //                 breakpoint: bp.id
-        //             })
-        //             this.queueEvent(location, event, done);
-        //         } else {
-        //             done();
-        //         }
-        //     }
-        // }
+        if (this.isNodePaused(location.id)) {
+            this.queueEvent(location, event, done);
+        } else {
+            if (event.msg && event.msg[DEBUGGER_PAUSED]) {
+                this.pause({
+                    reason: "step",
+                    node: location.id
+                })
+                this.queueEvent(location, event, done);
+            } else {
+                const bp = this.breakpointsByLocation.get(breakpointId);
+                if (bp && bp.active) {
+                    this.pause({
+                        reason: "breakpoint",
+                        node: location.id,
+                        breakpoint: bp.id
+                    })
+                    this.queueEvent(location, event, done);
+                } else {
+                    done();
+                }
+            }
+        }
     }
 
     enable() {
         this.log("Enabled");
         this.enabled = true;
         this.RED.hooks.add("preRoute.beaver", (sendEvent: SendEvent, done: EventCallback) => {
-            console.log("preRoute beaver", sendEvent.source.node, sendEvent.source.node._flow)
-            console.log(done)
+            console.log("preRoute beaver")
+            // console.log( sendEvent.source.node, sendEvent.source.node._flow)
+            // console.log(done)
 
             if (isNodeInSubflowModule(sendEvent.source.node)) {
                 // Inside a subflow module - don't pause the event
@@ -125,8 +127,8 @@ export class Beaver extends EventEmitter {
                 if (Object.prototype.hasOwnProperty.call(sendEvent.source.node._flow, "id")) {
                     // get the flow id from _flow with Object.prototype
 
-                    _flow_id = getProperty(sendEvent.source.node._flow, "id");
-                    // _flow_id = sendEvent.source.node._flow["id"];
+                    // _flow_id = getProperty(sendEvent.source.node._flow, "id");
+                    _flow_id = sendEvent.source.node._flow["id"];
                 }
 
                 if (
@@ -154,8 +156,8 @@ export class Beaver extends EventEmitter {
         });
         this.RED.hooks.add("onReceive.beaver", (receiveEvent: ReceiveEvent, done: EventCallback) => {
 
-            console.log("onReceive beaver", receiveEvent)
-            console.log(done)
+            console.log("onReceive beaver")
+            // console.log(done)
 
             if (receiveEvent.destination.node.type === "inject") {
                 // Never pause an Inject node's internal receive event

@@ -1,26 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// import {NodeMessage} from "node-red"
 
-// export type SendEvent = {
-//     msg: any,
-//     source: {
-//         id: string,
-//         node: any,
-//         port: number
-//     },
-//     destination: {
-//         id: string,
-//         node: any,
-//     },
-//     cloneMessage: boolean
-// }
+export type SendEvent = {
+    msg: any,
+    source: {
+        id: string,
+        node: any,
+        port: number
+    },
+    destination: {
+        id: string,
+        node: any,
+    },
+    cloneMessage: boolean
+}
 
-// export type ReceiveEvent = {
-//     msg: any,
-//     destination: {
-//         id: string,
-//         node: any,
-//     }
-// }
+export type ReceiveEvent = {
+    msg: any,
+    destination: {
+        id: string,
+        node: any,
+    }
+}
 
 export type EventCallback = (error?: any) => any;

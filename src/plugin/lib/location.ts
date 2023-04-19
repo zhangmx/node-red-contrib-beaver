@@ -1,4 +1,4 @@
-import { ReceiveEvent, SendEvent } from "node-red__util";
+import {ReceiveEvent, SendEvent} from "../nr-types"
 
 type PortType = "i" | "o";
 

@@ -105,7 +105,8 @@ module.exports = (RED: NodeAPI) => {
 
             RED.httpAdmin.post(`${apiRoot}/breakpoints`, routeAuthHandler, (req: Request, res: Response) => {
                 // req.body.location
-                console.log(req.body);
+                console.log("breakpoints post")
+                // console.log(req.body);
                 // TODO save node to recording camera list
                 const breakpointId = flowBeaver.setBreakpoint(
                     new Location(req.body.id, req.body.path, req.body.portType, req.body.portIndex)
