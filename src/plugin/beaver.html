@@ -1,7 +1,7 @@
 <link rel="stylesheet" href="resources/node-red-contrib-beaver/style.css">
 <script type="text/javascript">
     (function () {
-        console.log(RED);
+        // console.log(RED);
         if (!RED.view.annotations) {
             RED.notify("Beaver requires Node-RED 3.0.2 or later");
             return;
@@ -92,7 +92,7 @@
                 }
 
                 function onNodeRemove(node) {
-                    console.log("onNodeChange");
+                    console.log("onNodeRemove");
                     console.log(node);
 
                     if (breakpointsByNode[node.id]) {
@@ -104,9 +104,13 @@
                     delete queueDepths[node.id];
                 }
 
+                /**
+                 * this is first thing to be called
+                 * 
+                 */
                 function refreshState() {
                     console.log("refreshState");
-
+                    // query state
                     $.ajax({
                         url: "beaver",
                         type: "GET",
@@ -117,6 +121,7 @@
                             console.log(jqXHR, textStatus, errorThrown);
                         }
                     });
+                    // query messages
                     $.ajax({
                         url: "beaver/messages",
                         type: "GET",
@@ -136,6 +141,10 @@
                     });
                 }
 
+                /**
+                 * 
+                 * 
+                 */
                 function handleStateUpdate(state) {
 
                     console.log("handleStateUpdate");
@@ -225,9 +234,8 @@
                 var handlingCommsEvent = false;
 
                 sidebarContent = $("<div>").addClass("red-ui-beaver disabled").css({ "position": "relative", "height": "100%" });
-                var footerToolbar = $('<div></div>');
+                var footerToolbar = $('<div>footerToolbar</div>');
 
-                console.log(RED._("node-red-contrib-beaver/beaver:label.beaverShort"));
 
                 RED.sidebar.addTab({
                     id: "beaver",
@@ -967,7 +975,9 @@
                     RED.view.redraw();
                 }
 
-
+                /**
+                 * Resume the beaver
+                 */
                 function resumeBeaver() {
                     console.log("resumeBeaver");
 
@@ -983,6 +993,7 @@
                     RED.nodes.eachNode(function (n) { delete n._beaver_paused })
                     RED.view.redraw();
                 }
+
                 RED.events.on("nodes:add", onNodeChange);
                 RED.events.on("nodes:remove", onNodeRemove);
                 RED.events.on("nodes:change", onNodeChange);
@@ -991,14 +1002,19 @@
                 // RED.comms.subscribe("beaver/#", function(topic, msg) {
                 //     console.log(">",topic,msg)
                 // })
+
+                // first thing when we connect, ask for the current state
                 RED.comms.subscribe("beaver/connected", function (topic, msg) {
-                    refreshState(true);
+                    console.log("beaver/connected", topic, msg)
+                    refreshState();
                 });
                 RED.comms.subscribe("beaver/state", function (topic, msg) {
+                    console.log("beaver/state", topic, msg)
                     handleStateUpdate(msg)
                 });
 
                 RED.comms.subscribe("beaver/paused", function (topic, msg) {
+                    console.log("beaver/paused", topic, msg)
                     if (msg.pausedLocations) {
                         pausedLocations = new Set(msg.pausedLocations);
                     } else {
@@ -1010,6 +1026,8 @@
                 })
                 RED.comms.subscribe("beaver/resumed", resumeBeaver);
                 RED.comms.subscribe("beaver/messageQueued", function (topic, msg) {
+                    console.log("beaver/messageQueued", topic, msg)
+
                     msg.location = parseLocation(msg.location);
                     updateQueueDepth(msg.location, msg.depth);
                     messageList.editableList('addItem', {
@@ -1020,6 +1038,8 @@
                     })
                 })
                 RED.comms.subscribe("beaver/messageDispatched", function (topic, msg) {
+                    console.log("beaver/messageDispatched", topic, msg)
+
                     msg.location = parseLocation(msg.location);
                     updateQueueDepth(msg.location, msg.depth);
                     var message = queuedMessages[msg.id];
@@ -1060,6 +1080,7 @@
 
                     RED.view.annotations.unregister("red-ui-beaver-paused")
                 }
+
                 function enableBeaver() {
                     console.log("enableBeaver");
 
@@ -1100,6 +1121,7 @@
                     })
                     annotateFlow();
                 }
+
                 function annotatePorts(ports) {
                     console.log("annotatePorts", ports)
 
@@ -1111,6 +1133,7 @@
                             this)
                     })
                 }
+
                 function annotateFlow() {
                     console.log("annotateFlow")
 

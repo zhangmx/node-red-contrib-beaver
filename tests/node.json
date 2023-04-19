@@ -1,0 +1,90 @@
+{
+    "x": 360,
+    "y": 420,
+    "z": "2d5acf9cd2f58d69",
+    "type": "debug",
+    "changed": false,
+    "_config": {
+        "name": "\"debug 1\"",
+        "active": "true",
+        "tosidebar": "true",
+        "console": "false",
+        "tostatus": "false",
+        "complete": "\"false\"",
+        "statusVal": "\"\"",
+        "statusType": "\"auto\"",
+        "x": 360,
+        "y": 420
+    },
+    "id": "27f3490bc862c2be",
+    "_def": {
+        "category": "common",
+        "defaults": {
+            "name": {
+                "value": "_DEFAULT_"
+            },
+            "active": {
+                "value": true
+            },
+            "tosidebar": {
+                "value": true
+            },
+            "console": {
+                "value": false
+            },
+            "tostatus": {
+                "value": false
+            },
+            "complete": {
+                "value": "false",
+                "required": true
+            },
+            "targetType": {},
+            "statusVal": {
+                "value": ""
+            },
+            "statusType": {
+                "value": "auto"
+            }
+        },
+        "color": "#87a980",
+        "inputs": 1,
+        "outputs": 0,
+        "icon": "debug.svg",
+        "align": "right",
+        "button": {
+            "toggle": "active"
+        },
+        "set": {
+            "id": "node-red/debug",
+            "name": "debug",
+            "types": [
+                "debug"
+            ],
+            "enabled": true,
+            "local": false,
+            "user": false,
+            "module": "node-red",
+            "version": "3.0.2-git",
+            "added": true
+        },
+        "type": "debug"
+    },
+    "inputs": 1,
+    "outputs": 0,
+    "name": "debug 1",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "false",
+    "statusVal": "",
+    "statusType": "auto",
+    "dirty": false,
+    "valid": true,
+    "validationErrors": [],
+    "_index": 3,
+    "h": 30,
+    "resize": false,
+    "w": 120
+}

@@ -74,8 +74,8 @@
         "initialize": "",
         "finalize": "",
         "libs": [],
-        "x": 560,
-        "y": 160,
+        "x": 360,
+        "y": 300,
         "wires": [
             [
                 "27f3490bc862c2be"
@@ -94,8 +94,8 @@
         "complete": "false",
         "statusVal": "",
         "statusType": "auto",
-        "x": 760,
-        "y": 160,
+        "x": 360,
+        "y": 420,
         "wires": []
     }
 ]
