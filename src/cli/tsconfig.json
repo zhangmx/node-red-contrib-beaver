@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "target": "es6",
+        "module": "commonjs",
+        "moduleResolution": "nodenext",
+        "outDir": "../../cli",
+        "allowJs": true,
+        "checkJs": true,
+        "strict": true
+    },
+    "include": [
+        "./index.ts"
+    ]
+}

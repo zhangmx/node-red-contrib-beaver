@@ -2,3 +2,4 @@ scripts
 resources
 node_modules
 dist
+cli
