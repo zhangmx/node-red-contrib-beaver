@@ -1,2 +1,1077 @@
 <link rel="stylesheet" href="resources/node-red-contrib-beaver/style.css">
-<script type="module" src="resources/node-red-contrib-beaver/index.js"></script>
+<script type="text/javascript">
+(function () {
+    console.log(RED);
+    if (!RED.view.annotations) {
+        RED.notify("Beaver requires Node-RED 3.0.2 or later");
+        return;
+    }
+    var MAX_MESSAGE_LOADED = 10;
+    var sidebarContent;
+    var activeMessageFilter = 'all';
+
+    // TODO useless
+    function show() {
+        RED.sidebar.show("beaver");
+    }
+
+    RED.plugins.registerPlugin("node-red-contrib-beaver", {
+        onadd: function () {
+
+            function parseLocation(location) {
+                var parts = /^(.*?)\/([^\/\[]+)\[(i|o)\]\[(\d+)\]$/.exec(location);
+                var node = RED.nodes.node(parts[2]);
+                return {
+                    location: location,
+                    z: node ? node.z : null,
+                    path: parts[1],
+                    id: parts[2],
+                    portType: parts[3] === 'i' ? "input" : "output",
+                    portIndex: parts[4]
+                }
+            }
+
+            function updateQueueDepth(location, depth) {
+                queueDepths[location.id] = queueDepths[location.id] || { input: {}, output: {} }
+                if (queueDepths[location.id][location.portType][location.portIndex] !== depth) {
+                    queueDepths[location.id][location.portType][location.portIndex] = depth;
+                    if (annotations[location.id]) {
+                        var annotation = annotations[location.id][location.portType][location.portIndex];
+                        if (annotation) {
+                            annotation.pulse();
+                            if (depth > 0) {
+                                annotation.el.classList.add("hasMessages");
+                                if (depth < 100) {
+                                    annotation.label.classList.remove("small");
+                                    annotation.label.textContent = depth;
+                                } else {
+                                    annotation.label.classList.add("small");
+                                    if (depth < 1000) {
+                                        annotation.label.textContent = depth;
+                                    } else {
+                                        annotation.label.textContent = "999+";
+                                    }
+                                }
+                            } else {
+                                annotation.el.classList.remove("hasMessages");
+                                annotation.label.textContent = "";
+                            }
+                        }
+                    }
+                }
+            }
+
+            function onNodeChange(node) {
+                if (breakpointsByNode[node.id]) {
+                    breakpointsByNode[node.id].forEach(function (bp) {
+                        var newLabel = RED.utils.createNodeIcon(node, true);
+                        bp.listLabel.replaceWith(newLabel);
+                        bp.listLabel = newLabel;
+                    });
+                }
+                if (messagesByNode[node.id]) {
+                    for (var msgId in messagesByNode[node.id]) {
+                        if (messagesByNode[node.id].hasOwnProperty(msgId)) {
+                            var newLabel = RED.utils.createNodeIcon(node, true);
+                            messagesByNode[node.id][msgId].listLabel.replaceWith(newLabel);
+                            messagesByNode[node.id][msgId].listLabel = newLabel;
+                        }
+                    }
+                }
+                if (pausedLocations.has('*') || pausedLocations.has(node.id)) {
+                    node._beaver_paused = true;
+                }
+            }
+
+            function onNodeRemove(node) {
+                if (breakpointsByNode[node.id]) {
+                    breakpointsByNode[node.id].forEach(function (bp) {
+                        breakpointList.editableList('removeItem', bp);
+                    })
+                }
+                delete breakpointsByNode[node.id];
+                delete queueDepths[node.id];
+            }
+
+            function refreshState() {
+                $.ajax({
+                    url: "beaver",
+                    type: "GET",
+                    success: function (state) {
+                        handleStateUpdate(state);
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        console.log(jqXHR, textStatus, errorThrown);
+                    }
+                });
+                $.ajax({
+                    url: "beaver/messages",
+                    type: "GET",
+                    success: function (messages) {
+                        messageList.editableList('empty');
+                        messages.forEach(function (msg) {
+                            messageList.editableList('addItem', {
+                                id: msg.id,
+                                location: parseLocation(msg.location),
+                                msg: msg.msg
+                            })
+                        })
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        console.log(jqXHR, textStatus, errorThrown);
+                    }
+                });
+            }
+            
+            function handleStateUpdate(state) {
+                beaverState = state;
+                pausedLocations = new Set(state.pausedLocations || []);
+                beaverState.paused = pausedLocations.size > 0;
+
+
+                if (beaverEnabled !== state.enabled) {
+                    handlingCommsEvent = true;
+                    beaverEnabledToggle.prop("checked", !!state.enabled).trigger("change");
+                    handlingCommsEvent = false;
+                }
+                if (pausedLocations.size > 0) {
+                    pauseBeaver();
+                } else {
+                    if (pausedNotification) {
+                        resumeBeaver();
+                    }
+                }
+                if (state.breakpoints) {
+                    var existing = Object.keys(breakpoints);
+                    var added = {};
+                    var unchanged = {};
+                    var changed = {};
+                    state.breakpoints.forEach(function (bp) {
+                        if (!breakpoints.hasOwnProperty(bp.id)) {
+                            breakpointList.editableList("addItem", bp);
+                            added[bp.id] = bp;
+                        } else {
+                            var existing = breakpoints[bp.id];
+                            if (existing.active !== bp.active) {
+                                changed[bp.id] = bp;
+                                existing.setActive(bp.active, true);
+                            } else {
+                                unchanged[bp.id] = bp;
+                            }
+                        }
+                    })
+                    var toRemove = existing.filter(function (id) {
+                        return !unchanged[id] && !changed[id];
+                    })
+                    toRemove.forEach(function (id) {
+                        breakpointList.editableList("removeItem", breakpoints[id]);
+                    })
+
+                }
+                if (state.queues) {
+                    for (var i in state.queues) {
+                        if (state.queues.hasOwnProperty(i)) {
+                            updateQueueDepth(parseLocation(i), state.queues[i].depth);
+                        }
+                    }
+                }
+            }
+            
+            function postCommand(cmd, body) {
+                console.log(cmd, body)
+                var opts = {
+                    url: "beaver/" + cmd,
+                    type: "POST",
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        console.log(jqXHR, textStatus, errorThrown);
+                    }
+                }
+                if (body) {
+                    opts.contentType = "application/json";
+                    opts.data = JSON.stringify(body);
+                }
+                $.ajax(opts);
+            }
+
+            var beaverState;
+            var breakpoints = {};
+            var breakpointsByNode = {};
+            var messagesByNode = {};
+            var annotations = {};
+            var queueDepths = {};
+            var queuedMessages = {};
+            var pausedLocations = new Set();
+            var pausedNotification;
+            var beaverEnabled = false;
+            var handlingCommsEvent = false;
+
+            sidebarContent = $("<div>").addClass("red-ui-beaver disabled").css({ "position": "relative", "height": "100%" });
+            var footerToolbar = $('<div></div>');
+
+            console.log(RED._("node-red-contrib-beaver/beaver:label.beaverShort"));
+
+            RED.sidebar.addTab({
+                id: "beaver",
+                label: RED._("node-red-contrib-beaver/beaver:label.beaverShort"),
+                name: RED._("node-red-contrib-beaver/beaver:label.beaver"),
+                iconClass: "fa fa-paw",
+                content: sidebarContent,
+                toolbar: footerToolbar,
+                enableOnEdit: true,
+                action: "core:show-beaver-tab"
+            });
+
+            var header = $("<div>", { class: "red-ui-sidebar-header" }).appendTo(sidebarContent);
+
+            var headerLeftSpan = $('<span>').css({ "flex-grow": 1, "text-align": "left" }).appendTo(header);
+            var headerRightSpan = $('<span>', { class: "red-ui-beaver-toolbar" }).appendTo(header);
+            var headerPlayControl = $('<span>', { class: "button-group" }).appendTo(headerRightSpan);
+            var headerStepControl = $('<span>', { class: "button-group" }).appendTo(headerRightSpan);
+
+
+            var beaverEnabledToggle = $('<input type="checkbox"/>').appendTo(headerLeftSpan).toggleButton({
+                enabledIcon: "fa-toggle-on",
+                disabledIcon: "fa-toggle-off",
+                baseClass: "red-ui-sidebar-header-button"
+            }).on("change", function () {
+                beaverEnabled = this.checked;
+                if (!handlingCommsEvent) {
+                    $.ajax({
+                        url: "beaver",
+                        contentType: "application/json",
+                        type: "PUT",
+                        data: JSON.stringify({ enabled: beaverEnabled }),
+                        success: function (resp) {
+                            sidebarContent.toggleClass("disabled", !beaverEnabled);
+                        },
+                        error: function (jqXHR, textStatus, errorThrown) {
+                            console.log(jqXHR, textStatus, errorThrown);
+                        }
+                    });
+                } else {
+                    sidebarContent.toggleClass("disabled", !beaverEnabled);
+                }
+                if (beaverEnabled) {
+                    enableBeaver();
+                } else {
+                    disableBeaver()
+                }
+
+            });
+
+            var playPauseButton = $('<button type="button" class="red-ui-sidebar-header-button red-ui-beaver-btn-pauseresume"><i class="fa fa-pause"/></button>').appendTo(headerPlayControl).on("click", function (evt) {
+                if (beaverState.paused) {
+                    postCommand("resume");
+                } else {
+                    postCommand("pause")
+                }
+            });
+            RED.popover.tooltip(playPauseButton, function () {
+                return RED._("node-red-contrib-beaver/beaver:label." + (beaverState.paused ? "resume" : "pause"))
+            });
+
+            var stepButton = $('<button type="button" disabled class="red-ui-sidebar-header-button red-ui-beaver-btn-step"><i class="fa fa-step-forward"/></button>').appendTo(headerPlayControl).on("click", function (evt) {
+                postCommand("step")
+            });
+            RED.popover.tooltip(stepButton, RED._("node-red-contrib-beaver/beaver:label.step"));
+
+
+
+            var settingsPanelOpen = false;
+            var settingsButton = $('<button class="red-ui-sidebar-header-button" style="min-width: 30px"><i class="fa fa-cog"></i></button>').appendTo(headerStepControl).on("click", function (evt) {
+                evt.preventDefault();
+                evt.stopPropagation();
+                if (!settingsPanelOpen) {
+                    settingsButton.find("i").removeClass("fa-cog").addClass("fa-close");
+                    var breakpointAction = beaverState.config.breakpointAction || "pause-all";
+                    settingsPanel.find('input[value="' + breakpointAction + '"]').attr("checked", true);
+                    // settingsPanelPopover.container.width(breakpointSection.header.width()+20);
+                    settingsPanelPopover.show({
+                        offset: [settingsButton.outerWidth(), 11],
+                        align: 'left',
+                        target: settingsButton,//breakpointSection.header,
+                        dispose: false,
+                        closeButton: settingsButton,
+                        onclose: function () {
+                            settingsButton.find("i").removeClass("fa-close").addClass("fa-cog");
+                            settingsPanelOpen = false;
+                        }
+                    })
+                    settingsPanelOpen = true;
+                    settingsPanel.find(':focusable').eq(0).focus();
+                } else {
+                    settingsPanelOpen = false;
+                    settingsButton.find("i").removeClass("fa-close").addClass("fa-cog");
+                    settingsPanelPopover.hide(false);
+                }
+            });
+            RED.popover.tooltip(settingsButton, RED._("node-red-contrib-beaver/beaver:label.settings"))
+            var settingsPanel = $('<div class="red-ui-beaver-settings"></div>').css({ padding: "8px" });
+            $('<div data-i18n="node-red-contrib-beaver/beaver:label.breakpointAction.label"></div>').appendTo(settingsPanel);
+            $('<label><input type="radio" class="red-ui-sidebar-header-button-toggle" name="red-ui-beaver-pause-option" value="pause-all"><span data-i18n="node-red-contrib-beaver/beaver:label.breakpointAction.pause-all"></span></label>').appendTo(settingsPanel);
+            $('<label><input type="radio" class="red-ui-sidebar-header-button-toggle" name="red-ui-beaver-pause-option" value="pause-bp"><span data-i18n="node-red-contrib-beaver/beaver:label.breakpointAction.pause-bp"></span></label>').appendTo(settingsPanel);
+            settingsPanel.i18n();
+            settingsPanel.find('input[type="radio"]').on("change", function (evt) {
+                $.ajax({
+                    url: "beaver",
+                    contentType: "application/json",
+                    type: "PUT",
+                    data: JSON.stringify({ config: { breakpointAction: this.value } }),
+                    success: function (resp) { },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        console.log(jqXHR, textStatus, errorThrown);
+                    }
+                });
+            });
+            settingsPanel.on("mouseleave", function () {
+                settingsPanelOpen = false;
+                settingsButton.find("i").removeClass("fa-close").addClass("fa-cog");
+                settingsPanelPopover.hide(false);
+            })
+            var settingsPanelPopover = RED.popover.panel(settingsPanel);
+
+
+
+            var stackContainer = $('<div>', { class: "red-ui-beaver-stack" }).css({ height: "100%" }).appendTo(sidebarContent);
+            var sections = RED.stack.create({
+                container: stackContainer
+            });
+            var breakpointSection = sections.add({
+                title: RED._("node-red-contrib-beaver/beaver:label.breakpoints"),
+                collapsible: true
+            });
+            breakpointSection.expand();
+            breakpointSection.content.css({ height: "100%" });
+
+            var breakpointList = $('<ol>', { class: "red-ui-beaver-breakpoint-list" }).appendTo(breakpointSection.content).editableList({
+                addButton: false,
+                removable: true,
+                removeItem: function (item) {
+                    delete breakpoints[item.id];
+                    if (item.annotation) {
+                        item.annotation.el.classList.remove("active");
+                        item.annotation.el.classList.remove("inactive");
+                        delete item.annotation.breakpoint;
+                    }
+                    $.ajax({
+                        url: "beaver/breakpoints/" + item.id,
+                        type: "DELETE",
+                        error: function (jqXHR, textStatus, errorThrown) {
+                            console.log(jqXHR, textStatus, errorThrown);
+                        }
+                    });
+
+                },
+                addItem: function (row, index, item) {
+                    breakpoints[item.id] = item;
+                    breakpointsByNode[item.location.id] = breakpointsByNode[item.location.id] || [];
+                    breakpointsByNode[item.location.id].push(item);
+                    /*
+                     *  {
+                     *     id: string
+                     *     location: { id portType portIndex }
+                     *     setActive: func(active){}
+                     *     active: true/false
+                     *     listLabel: DOM Element of Node Icon
+                     *     listItem: DOM Element of list item
+                     *     annotation { el: DOM Element, breakpoint: circular ref}
+                     *  }
+                     */
+                    item.listItem = row;
+
+                    row.addClass("red-ui-beaver-breakpoint")
+                    row.addClass("red-ui-beaver-breakpoint-" + (item.location.portType === 'i' ? "input" : "output"))
+                    var activeToggle = $('<input type="checkbox">')
+                        .prop("checked", item.active).appendTo(row)
+                        .on('change', function () {
+                            item.setActive(this.checked);
+                        });
+                    row.toggleClass("active", item.active)
+                    item.setActive = function (active, skipUpdate) {
+                        item.active = active;
+                        row.toggleClass("active", active)
+                        activeToggle.prop("checked", active);
+                        if (annotations[item.location.id]) {
+                            var annotation = annotations[item.location.id][item.location.portType === 'i' ? "input" : "output"][item.location.portIndex];
+                            if (annotation) {
+                                annotation.el.classList.toggle("active", active);
+                                annotation.el.classList.toggle("inactive", !active);
+                            }
+                        }
+                        if (!skipUpdate) {
+                            $.ajax({
+                                url: "beaver/breakpoints/" + item.id,
+                                contentType: "application/json",
+                                data: JSON.stringify({ active: active }),
+                                type: "PUT",
+                                error: function (jqXHR, textStatus, errorThrown) {
+                                    console.log(jqXHR, textStatus, errorThrown);
+                                }
+                            });
+                        }
+                    }
+                    if (annotations[item.location.id]) {
+                        var annotation = annotations[item.location.id][item.location.portType === 'i' ? "input" : "output"][item.location.portIndex];
+                        if (annotation) {
+                            annotation.breakpoint = item;
+                            item.annotation = annotation;
+                            annotation.el.classList.toggle("active", item.active);
+                            annotation.el.classList.toggle("inactive", !item.active);
+                        }
+                    }
+
+                    var node = RED.nodes.node(item.location.id);
+                    var nodeLabel = $('<a href="#"></a>').appendTo(row).on('click', function (evt) {
+                        evt.preventDefault();
+                        evt.stopPropagation();
+                        RED.view.reveal(item.location.id);
+                    })
+                    if (node) {
+                        item.listLabel = RED.utils.createNodeIcon(node, true).appendTo(nodeLabel);
+                    } else {
+                        item.listLabel = $('<span>').text(item.location.id).appendTo(nodeLabel);
+                    }
+                    var bpLabel = item.location.portType === 'i' ? RED._("node-red-contrib-beaver/beaver:label.input") : (RED._("node-red-contrib-beaver/beaver:label.output") + " " + (item.location.portIndex + 1))
+                    RED.popover.tooltip(nodeLabel, bpLabel);
+
+                    row.on("mouseenter", function () {
+                        if (annotations[item.location.id]) {
+                            var annotation = annotations[item.location.id][item.location.portType === 'i' ? "input" : "output"][item.location.portIndex];
+                            if (annotation) {
+                                annotation.highlight(true);
+                            }
+                        }
+                    }).on("mouseleave", function () {
+                        if (annotations[item.location.id]) {
+                            var annotation = annotations[item.location.id][item.location.portType === 'i' ? "input" : "output"][item.location.portIndex];
+                            if (annotation) {
+                                annotation.highlight(false);
+                            }
+                        }
+                    })
+                }
+            })
+
+            var messageSection = sections.add({
+                title: RED._("node-red-contrib-beaver/beaver:label.messages"),
+                collapsible: true
+            });
+            messageSection.expand();
+            messageSection.content.css({ height: "100%" });
+            var messageToolbar = $('<div style="float: right"></div>').appendTo(messageSection.header);
+
+            var messageFilterPanelOpen = false;
+            var messageFilterButton = $('<button class="red-ui-button red-ui-button-small"><i class="fa fa-filter"></i></button>').css({
+                "min-width": "22px"
+            }).appendTo(messageToolbar).on("click", function (evt) {
+                evt.preventDefault();
+                evt.stopPropagation();
+                if (!messageFilterPanelOpen) {
+                    messageFilterPanel.find('input[value="' + activeMessageFilterType + '"]').attr("checked", true);
+                    messageFilterButton.find("i").removeClass("fa-filter").addClass("fa-close");
+                    messageFilterPanelPopover.show({
+                        offset: [messageFilterButton.outerWidth(), 2],
+                        align: 'left',
+                        target: messageFilterButton,//breakpointSection.header,
+                        dispose: false,
+                        closeButton: messageFilterButton,
+                        onclose: function () {
+                            messageFilterButton.find("i").removeClass("fa-close").addClass("fa-filter");
+                            messageFilterPanelOpen = false;
+                        }
+                    })
+                    messageFilterPanelOpen = true;
+                } else {
+                    messageFilterPanelOpen = false;
+                    messageFilterButton.find("i").removeClass("fa-close").addClass("fa-filter");
+                    messageFilterPanelPopover.hide(false);
+                }
+            });
+            var messageFilterLabel = $('<span style="margin-left: 3px"></span>').text(RED._("node-red-contrib-beaver/beaver:label.filter.all")).appendTo(messageFilterButton);
+            RED.popover.tooltip(messageFilterButton, RED._("node-red-contrib-beaver/beaver:label.filter.label"))
+
+            var messageFilterPanel = $('<div class="red-ui-beaver-settings"></div>').css({ padding: "8px" });
+            $('<label><input type="radio" class="red-ui-sidebar-header-button-toggle" name="red-ui-beaver-message-filter-option" value="all"><span data-i18n="node-red-contrib-beaver/beaver:label.filter.all"></span></label>').appendTo(messageFilterPanel);
+            $('<label><input type="radio" class="red-ui-sidebar-header-button-toggle" name="red-ui-beaver-message-filter-option" value="flow"><span data-i18n="node-red-contrib-beaver/beaver:label.filter.flow"></span></label>').appendTo(messageFilterPanel);
+            messageFilterPanel.i18n();
+            messageFilterPanel.find('input[type="radio"]').on("change", function (evt) {
+                messageFilterLabel.text(RED._("node-red-contrib-beaver/beaver:label.filter." + this.value));
+                activeMessageFilterType = this.value;
+                messageList.editableList("filter");
+                messageFilterPanelOpen = false;
+                messageFilterButton.find("i").removeClass("fa-close").addClass("fa-filter");
+                messageFilterPanelPopover.hide(false);
+            });
+            var messageFilterPanelPopover = RED.popover.panel(messageFilterPanel);
+
+            var activeMessageFilterType = "all";
+            var messageList = $('<ol>', { class: "red-ui-beaver-message-list" }).appendTo(messageSection.content).editableList({
+                addButton: false,
+                filter: function (item) {
+                    item._visible = activeMessageFilterType === "all" || item.location.z === RED.workspaces.active();
+                    return item._visible;
+                },
+                removeItem: function (item) {
+                    var location = item.location;
+                    if (annotations[location.id]) {
+                        var ann = annotations[location.id][location.portType][location.portIndex];
+                        if (ann) {
+                            ann.highlight(false);
+                        }
+                    }
+                    delete queuedMessages[item.id];
+                    delete messagesByNode[location.id][item.id];
+                    updateMessageList();
+                },
+                addItem: function (row, index, item) {
+                    queuedMessages[item.id] = item;
+                    var location = item.location;
+                    messagesByNode[location.id] = messagesByNode[location.id] || {};
+                    messagesByNode[location.id][item.id] = item;
+
+                    var destinationLocation = item.destination ? parseLocation(item.destination) : null;
+                    row.addClass("red-ui-beaver-message");
+                    row.on("mouseenter", function (evt) {
+                        if (annotations[location.id]) {
+                            var ann = annotations[location.id][location.portType][location.portIndex];
+                            if (ann) {
+                                ann.highlight(true);
+                            }
+                        }
+                    }).on("mouseleave", function (evt) {
+                        if (annotations[location.id]) {
+                            var ann = annotations[location.id][location.portType][location.portIndex];
+                            if (ann) {
+                                ann.highlight(false);
+                            }
+                        }
+                    });
+
+                    var topRow = $('<div class="red-ui-debug-msg-meta"></div>').appendTo(row);
+                    var bottomRow = $('<span></span>').appendTo(row);
+
+                    // if (!destinationLocation) {
+                    //     // msg arriving at location
+                    //     $('<svg width="20" height="20" viewbox="0 0 20 20"><path d="M 5 10 v 10 m 0 -5 h 20" stroke="#666" fill="none"></svg>').appendTo(topRow);
+                    // }
+                    var pathParts = location.path.split("/");
+                    // Take off the top most flow id
+                    pathParts.shift();
+                    // Add on the node id if it isn't already there
+                    if (pathParts[pathParts.length - 1] !== location.id) {
+                        pathParts.push(location.id);
+                    }
+                    pathParts.forEach(function (nodeId, i) {
+                        var srcLink = $('<a href="#"></a>').css({
+                            "display": "flex",
+                            "align-items": "center",
+                            "margin-top": Math.max(-10, (pathParts.length - 1 - i) * -2) + "px",
+                            "margin-left": (i * -8) + "px"
+                        }).appendTo(topRow).on("click", function (evt) {
+                            evt.preventDefault();
+                            RED.view.reveal(nodeId);
+                        });
+
+
+                        var srcNode = RED.nodes.node(nodeId);
+                        if (srcNode) {
+                            item.listLabel = RED.utils.createNodeIcon(srcNode, i === pathParts.length - 1).appendTo(srcLink).addClass("red-ui-node-icon-small");
+                        } else {
+                            item.listLabel = $('<span>').addClass('red-ui-node-label').text(nodeId).appendTo(srcLink);
+                        }
+                        if (i === pathParts.length - 1) {
+                            $('<span>').addClass('red-ui-node-label').text("[" + location.portType + (location.portType === "output" ? (" " + (parseInt(location.portIndex) + 1)) : "") + "]").css("margin-left", "5px").appendTo(srcLink);
+                        }
+                        srcLink.on("mouseenter", function (evt) {
+                            var n = RED.nodes.node(nodeId);
+                            if (n) {
+                                n.highlighted = true;
+                                n.dirty = true;
+                            }
+                            RED.view.redraw();
+                        }).on("mouseleave", function (evt) {
+                            var n = RED.nodes.node(nodeId);
+                            if (n) {
+                                n.highlighted = false;
+                                n.dirty = true;
+                            }
+                            RED.view.redraw();
+                        })
+                    });
+
+                    if (destinationLocation) {
+                        var dstLink = $('<a href="#"><span class="red-ui-node-label">[ <i class="fa fa-angle-right"></i></span> </a>').addClass('red-ui-node-label').css("margin-left", "20px").appendTo(topRow).on("click", function (evt) {
+                            evt.preventDefault();
+                            RED.view.reveal(destinationLocation.id);
+                        });
+                        $('<span>').addClass('red-ui-node-label').text(destinationLocation.id.substring(0, 6) + "... ]").appendTo(dstLink);
+                        dstLink.on("mouseenter", function (evt) {
+                            var n = RED.nodes.node(destinationLocation.id);
+                            if (n) {
+                                n.highlighted = true;
+                                n.dirty = true;
+                            }
+                            RED.view.redraw();
+                        }).on("mouseleave", function (evt) {
+                            var n = RED.nodes.node(destinationLocation.id);
+                            if (n) {
+                                n.highlighted = false;
+                                n.dirty = true;
+                            }
+                            RED.view.redraw();
+                        })
+                    }
+
+                    var tools = $('<span class="red-ui-beaver-msg-tools button-group"></span>').appendTo(topRow);
+                    var stepItem = $('<button class="red-ui-button red-ui-button-small"><i class="fa fa-step-forward"></i></button>').appendTo(tools);
+                    var stepMessage = RED.popover.tooltip(stepItem, RED._("node-red-contrib-beaver/beaver:label.stepMessage"));
+                    stepItem.on("click", function (evt) {
+                        evt.preventDefault();
+                        evt.stopPropagation();
+                        postCommand("step", { message: item.id })
+                        messageList.editableList("removeItem", item);
+                        stepMessage.close();
+                    });
+
+                    var deleteItem = $('<button class="red-ui-button red-ui-button-small"><i class="fa fa-trash"></i></button>').appendTo(tools);
+                    var deleteMessage = RED.popover.tooltip(deleteItem, RED._("node-red-contrib-beaver/beaver:label.deleteMessage"));
+                    deleteItem.on("click", function (evt) {
+                        evt.preventDefault();
+                        evt.stopPropagation();
+                        $.ajax({
+                            url: "beaver/messages/" + item.id,
+                            type: "DELETE",
+                            error: function (jqXHR, textStatus, errorThrown) {
+                                console.log(jqXHR, textStatus, errorThrown);
+                            }
+                        });
+                        deleteMessage.close();
+                    });
+                    item.messageRow = bottomRow;
+                    item.loaded = false;
+                    if (messageList.editableList('length') > MAX_MESSAGE_LOADED) {
+                        // This isn't going to get instantly loaded, so add the
+                        // click-to-load button
+                        var loading = false;
+                        bottomRow.addClass("red-ui-beaver-message-load")
+                        $('<a href="#">').text("show message").appendTo(bottomRow).on("click", function (evt) {
+                            evt.preventDefault();
+                            if (!loading) {
+                                loading = true;
+                                loadMessage(item);
+                            }
+                        });
+                    }
+
+                    updateMessageList();
+                }
+            })
+
+            RED.events.on("workspace:change", function () {
+                if (activeMessageFilterType === "flow") {
+                    messageList.editableList("filter");
+                    updateMessageList();
+                }
+            });
+
+            var updateMessageListTimer;
+
+            function updateMessageList() {
+                if (!beaverEnabled) {
+                    return;
+                }
+                if (!updateMessageListTimer) {
+                    updateMessageListTimer = setTimeout(function () {
+                        updateMessageListTimer = null;
+                        var visibleCount = 0;
+                        messageList.editableList('items').each(function (index) {
+                            var ml = $(this);
+                            console.log("updateMessageList messageList",ml);
+                            var item = ml.data('data');
+                            if (item._visible) {
+                                visibleCount++;
+                            }
+                            if (visibleCount <= MAX_MESSAGE_LOADED) {
+                                if (!item.loaded) {
+                                    loadMessage(item)
+                                }
+                            }
+                        })
+                    }, 100)
+                }
+            }
+
+            function loadMessage(item) {
+                $.ajax({
+                    url: "beaver/messages/" + item.id,
+                    type: "GET",
+                    success: function (message) {
+                        item.loaded = true;
+                        insertMessage(item, message);
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        console.log(jqXHR, textStatus, errorThrown);
+                    }
+                });
+            }
+            
+            function insertMessage(item, message) {
+                item.messageRow.empty();
+                item.messageRow.addClass('red-ui-debug-msg-payload').removeClass('red-ui-beaver-message-load');
+                var msg = RED.utils.decodeObject(message.msg.msg, message.msg.format);
+                var el = $('<span class="red-ui-debug-msg-payload"></span>').appendTo(item.messageRow);
+                var debugMessage = RED.utils.createObjectElement(msg, {
+                    sourceId: true, // <- needed to get controls to appear
+                    path: '',
+                    // tools: function(key,value) {
+                    //     if (value && value.hasOwnProperty('__enc__')) {
+                    //         if (value.type === 'function' || value.type === 'internal') {
+                    //             return null;
+                    //         }
+                    //     }
+                    //     var tools = $('<span class="button-group"></span>');
+                    //     var editItem = $('<button class="red-ui-button red-ui-button-small"><i class="fa fa-pencil"></i></button>').appendTo(tools).on("click", function(evt) {
+                    //         evt.preventDefault();
+                    //         evt.stopPropagation();
+                    //         console.log(key,value);
+                    //
+                    //         RED.editor.editJavaScript({
+                    //             value: JSON.stringify(value,' ',4),
+                    //             complete: function(v) {
+                    //                 console.log("NEW VALUE",v)
+                    //             }
+                    //         })
+                    //
+                    //
+                    //     });
+                    //     return tools;
+                    // },
+                    key: /*true*/null
+                });
+                debugMessage.appendTo(el);
+            }
+
+            function pauseBeaver() {
+                $("#red-ui-workspace").addClass("red-ui-beaver-paused");
+                $(".red-ui-beaver-btn-pauseresume i").removeClass("fa-pause").addClass("fa-play");
+                $(".red-ui-beaver-btn-step").prop("disabled", null);
+
+                if (!pausedNotification) {
+                    var notificationContent = $('<p class="red-ui-beaver-notification">');
+                    $('<span>').text(RED._("node-red-contrib-beaver/beaver:label.paused")).appendTo(notificationContent);
+                    var notificationButtons = $('<span>', { class: "red-ui-beaver-toolbar button-group" }).appendTo(notificationContent);
+
+                    var resumeButton = $('<button type="button" class="red-ui-button red-ui-button-small red-ui-beaver-btn-pauseresume"><i class="fa fa-play"/></button>').appendTo(notificationButtons).on("click", function (evt) {
+                        postCommand("resume");
+                    });
+                    RED.popover.tooltip(resumeButton, RED._("node-red-contrib-beaver/beaver:label.resume"))
+
+                    var stepButton = $('<button type="button" class="red-ui-button red-ui-button-small"><i class="fa fa-step-forward"/></button>').appendTo(notificationButtons).on("click", function (evt) {
+                        postCommand("step")
+                    });
+                    RED.popover.tooltip(stepButton, RED._("node-red-contrib-beaver/beaver:label.step"))
+
+                    pausedNotification = RED.notify(notificationContent, { fixed: true });
+                }
+                var allPaused = pausedLocations.has("*");
+                RED.nodes.eachNode(function (n) {
+                    n._beaver_paused = allPaused || pausedLocations.has(n.id);
+                })
+                RED.view.redraw();
+            }
+            function resumeBeaver() {
+                if (pausedNotification) {
+                    pausedNotification.close();
+                    pausedNotification = null;
+                }
+                pausedLocations.clear();
+                $(".red-ui-beaver-btn-pauseresume i").removeClass("fa-play").addClass("fa-pause");
+                $(".red-ui-beaver-btn-step").prop("disabled", true);
+                beaverState.paused = false;
+                RED.nodes.eachNode(function (n) { delete n._beaver_paused })
+                RED.view.redraw();
+            }
+            RED.events.on("nodes:add", onNodeChange);
+            RED.events.on("nodes:remove", onNodeRemove);
+            RED.events.on("nodes:change", onNodeChange);
+
+            //
+            // RED.comms.subscribe("beaver/#", function(topic, msg) {
+            //     console.log(">",topic,msg)
+            // })
+            RED.comms.subscribe("beaver/connected", function (topic, msg) {
+                refreshState(true);
+            });
+            RED.comms.subscribe("beaver/state", function (topic, msg) {
+                handleStateUpdate(msg)
+            });
+
+            RED.comms.subscribe("beaver/paused", function (topic, msg) {
+                if (msg.pausedLocations) {
+                    pausedLocations = new Set(msg.pausedLocations);
+                } else {
+                    pausedLocations.clear();
+                    pausedLocations.add("*");
+                }
+                beaverState.paused = pausedLocations.size > 0;
+                pauseBeaver();
+            })
+            RED.comms.subscribe("beaver/resumed", resumeBeaver);
+            RED.comms.subscribe("beaver/messageQueued", function (topic, msg) {
+                msg.location = parseLocation(msg.location);
+                updateQueueDepth(msg.location, msg.depth);
+                messageList.editableList('addItem', {
+                    id: msg.id,
+                    location: msg.location,
+                    msg: msg.msg,
+                    destination: msg.destination
+                })
+            })
+            RED.comms.subscribe("beaver/messageDispatched", function (topic, msg) {
+                msg.location = parseLocation(msg.location);
+                updateQueueDepth(msg.location, msg.depth);
+                var message = queuedMessages[msg.id];
+                if (message) {
+                    messageList.editableList('removeItem', message);
+                }
+            })
+
+
+            RED.actions.add("beaver:show-beaver-tab", () => RED.sidebar.show("beaver"));
+            RED.actions.add("beaver:pause-flows", function () { postCommand('pause') });
+            RED.actions.add("beaver:resume-flows", function () { postCommand('resume') });
+            RED.actions.add("beaver:step-flows", function () { postCommand('step') });
+            RED.actions.add("beaver:enable-beaver", function () {
+                beaverEnabledToggle.prop("checked", true).trigger("change");
+            });
+            RED.actions.add("beaver:disable-beaver", function () {
+                beaverEnabledToggle.prop("checked", false).trigger("change");
+            });
+
+            function disableBeaver() {
+                breakpointList.editableList('empty');
+                messageList.editableList('empty');
+                RED.hooks.remove("*.beaver");
+                $(".red-ui-beaver-port-overlay").each(function () {
+                    var portGroup = $(this).parent()[0];
+                    portGroup.removeEventListener("mouseenter", portGroup.__breakpoint__.onenter)
+                    portGroup.removeEventListener("mouseleave", portGroup.__breakpoint__.onleave)
+                    $(this).remove();
+                });
+                breakpoints = {};
+                breakpointsByNode = {};
+                annotations = {};
+                queueDepths = {};
+                queuedMessages = {};
+
+                RED.view.annotations.unregister("red-ui-beaver-paused")
+            }
+            function enableBeaver() {
+                RED.hooks.add("viewAddPort.beaver", function (evt) {
+                    createPortAnnotation(evt.node, evt.portType, evt.portIndex, evt.port)
+                })
+                RED.hooks.add("viewRemovePort.beaver", function (evt) {
+                    delete annotations[evt.node.id][evt.portType][evt.portIndex];
+                })
+                RED.hooks.add("viewRemoveNode.beaver", function (evt) {
+                    delete annotations[evt.node.id];
+                })
+
+                RED.view.annotations.register("red-ui-beaver-paused", {
+                    type: "badge",
+                    class: "red-ui-beaver-annotation-paused",
+                    show: "_beaver_paused",
+                    element: function () {
+                        var buttonGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                        buttonGroup.setAttribute("transform", "translate(0,-2)")
+                        var pauseButton = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                        pauseButton.setAttribute("rx", 2);
+                        pauseButton.setAttribute("width", 12)
+                        pauseButton.setAttribute("height", 12)
+                        pauseButton.setAttribute("fill", "white")
+                        pauseButton.setAttribute("stroke-width", "1")
+
+                        var pauseLogo = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        pauseLogo.setAttribute("d", "M 4 2 v 8 M 8 2 v 8")
+                        pauseLogo.setAttribute("stroke-width", "3")
+
+                        buttonGroup.appendChild(pauseButton)
+                        buttonGroup.appendChild(pauseLogo)
+                        return buttonGroup;
+                    }
+                })
+                annotateFlow();
+            }
+            function annotatePorts(ports) {
+                $(ports).each(function () {
+                    createPortAnnotation(this.__port__.__data__, this.__port__.__portType__ === 0 ? "output" : "input", this.__port__.__portIndex__, this)
+                })
+            }
+            function annotateFlow() {
+                annotatePorts(".red-ui-flow-port-output");
+                annotatePorts(".red-ui-flow-port-input");
+            }
+
+
+            /**
+             * Creates a port annotation for the given node/port
+             * 
+             * 
+             * @param node
+             * @param portType
+             * @param portIndex
+             * @param portGroup
+             */
+            function createPortAnnotation(node, portType, portIndex, portGroup) {
+                //TODO: change to record both input and output ports for a node
+                if ((node.type === "link in" && portType === "input") || (node.type === "link out" && portType === "output")) {
+                    return;
+                }
+
+                var overlay = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                overlay.setAttribute("class", "red-ui-beaver-port-overlay");
+
+                var portRing = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                portRing.setAttribute("d", "M -12 -6.5 h 24 q 4 0 4 4 v 5 q 0 4 -4 4 h -24 q -4 0 -4 -4 v -5 q 0 -4 4 -4 z");
+                portRing.setAttribute("class", "red-ui-beaver-port-overlay-background");
+
+                var portPulse;
+                var portHighlight;
+
+                var pulseGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                if (portType === "input") {
+                    // portRing.setAttribute("d","M -1 10 h -14 q -3 0 -3 -3 v -4 q 0 -3 3 -3 h 14 q 1 -1.5 2.5 -1.5 h 6 q 4 0 4 4 v 5 q 0 4 -4 4 h -6 q -1.5 0 -2.5 -1.5 z");
+                    pulseGroup.setAttribute("transform", "translate(-4.5,5)");
+                } else {
+                    // portRing.setAttribute("d","M -1 10 h -14 q -3 0 -3 -3 v -4 q 0 -3 3 -3 h 14 q 1 -1.5 2.5 -1.5 h 6 q 4 0 4 4 v 5 q 0 4 -4 4 h -6 q -1.5 0 -2.5 -1.5 z");
+                    pulseGroup.setAttribute("transform", "translate(14.5,5)");
+                }
+                pulseGroup.appendChild(portRing);
+                overlay.appendChild(pulseGroup);
+
+                var statusLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                statusLabel.setAttribute("class", "red-ui-beaver-port-overlay-label");
+                statusLabel.setAttribute("x", portType === "input" ? -1 : 26);
+                statusLabel.setAttribute("y", 9.5);
+
+                overlay.appendChild(statusLabel);
+
+                annotations[node.id] = annotations[node.id] || {
+                    input: {},
+                    output: {}
+                }
+                annotations[node.id][portType][portIndex] = {
+                    el: overlay,
+                    label: statusLabel,
+                    pulse: function () {
+                        if (!portPulse) {
+                            portPulse = portRing.cloneNode(true);
+                            portPulse.classList.add("red-ui-beaver-port-overlay-pulse");
+                            pulseGroup.appendChild(portPulse);
+                        } else {
+                            var newPulse = portPulse.cloneNode(true);
+                            portPulse.remove();
+                            pulseGroup.appendChild(newPulse);
+                            portPulse = newPulse;
+                        }
+                    },
+                    highlight: function (state) {
+                        if (!!portHighlight === state) {
+                            return;
+                        }
+                        if (portHighlight) {
+                            portHighlight.remove();
+                            portHighlight = null;
+                        } else {
+                            portHighlight = portRing.cloneNode(true);
+                            portHighlight.setAttribute("class", "red-ui-beaver-port-overlay-highlight");
+                            pulseGroup.appendChild(portHighlight);
+                        }
+                    }
+                }
+                var self = annotations[node.id][portType][portIndex];
+                if (breakpointsByNode[node.id]) {
+                    for (var i = 0, l = breakpointsByNode[node.id].length; i < l; i++) {
+                        var bp = breakpointsByNode[node.id][i];
+                        // TODO: standardize portType representation.
+                        // breakpoint uses i/o - this function receives input/output
+                        if (bp.location.portType === portType[0] && bp.location.portIndex === portIndex) {
+                            overlay.classList.toggle("active", bp.active);
+                            overlay.classList.toggle("inactive", !bp.active);
+                            self.breakpoint = bp;
+                            bp.annotation = self;
+                            break;
+                        }
+                    }
+                }
+                portGroup.insertBefore(overlay, portGroup.children[0]);
+                portGroup.__breakpoint__ = {
+                    onenter: function () {
+                        if (RED.view.state() === RED.state.DEFAULT) {
+                            if (!self.breakpoint) {
+                                overlay.classList.add("pending");
+                            }
+                        }
+                        if (self.breakpoint) {
+                            self.breakpoint.listItem.parent().addClass("highlight")
+                        }
+                    },
+                    onleave: function () {
+                        overlay.classList.remove("pending");
+                        if (self.breakpoint) {
+                            self.breakpoint.listItem.parent().removeClass("highlight")
+                            if (self.pendingRemoval) {
+                                delete self.pendingRemoval;
+                                breakpointList.editableList("removeItem", self.breakpoint);
+                            }
+                        }
+                    }
+                }
+                portGroup.addEventListener("mouseenter", portGroup.__breakpoint__.onenter)
+                portGroup.addEventListener("mouseleave", portGroup.__breakpoint__.onleave)
+                overlay.addEventListener("click", function () {
+                    if (self.breakpoint) {
+                        if (self.breakpoint.active) {
+                            self.breakpoint.setActive(!self.breakpoint.active);
+                        } else if (self.pendingRemoval) {
+                            overlay.classList.remove("pending");
+                            self.breakpoint.listItem.parent().removeClass("pending");
+                            delete self.pendingRemoval;
+                            self.breakpoint.setActive(true);
+                        } else {
+                            overlay.classList.add("pending");
+                            self.breakpoint.listItem.parent().addClass("pending");
+                            self.pendingRemoval = true;
+                        }
+                    } else {
+                        overlay.classList.remove("pending");
+                        var isSubflow = !!RED.nodes.subflow(node.z);
+                        $.ajax({
+                            url: "beaver/breakpoints",
+                            contentType: "application/json",
+                            data: JSON.stringify({ id: node.id, path: isSubflow ? "*" : node.z, portType: portType[0], portIndex: portIndex }),
+                            type: "POST",
+                            success: function (resp) {
+                                breakpointList.editableList("addItem", resp);
+                            },
+                            error: function (jqXHR, textStatus, errorThrown) {
+                                console.log(jqXHR, textStatus, errorThrown);
+                            }
+                        });
+                    }
+                })
+                if (queueDepths[node.id]) {
+                    var depth = queueDepths[node.id][portType][portIndex];
+                    if (depth > 0) {
+                        overlay.classList.add("hasMessages");
+                        statusLabel.textContent = depth;
+                    } else {
+                        overlay.classList.remove("hasMessages");
+                        statusLabel.textContent = "";
+                    }
+                }
+            }
+        }
+    })
+})();
+</script>
