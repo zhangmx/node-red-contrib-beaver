@@ -34,7 +34,7 @@ let BREAKPOINT_ID = 1;
 // }
 
 
-export class Beaver extends EventEmitter {
+export class FlowBeaver extends EventEmitter {
 
     PRIVATERED: NodeRedApp;
     RED: NodeAPI;
