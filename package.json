@@ -22,7 +22,7 @@
   "node-red": {
     "version": ">=3.0.0",
     "plugins": {
-      "beaver": "dist/index.js"
+      "beaver": "dist/beaver.js"
     }
   },
   "files": [
@@ -38,7 +38,7 @@
   ],
   "scripts": {
     "start": "npm run svr",
-    "build": "npm run build:cli && npm run build:plugin && npx eslint . && npm run copyfiles",
+    "build": "npm run build:cli && npm run build:plugin && npx eslint . && npm run copyAssets",
     "build:cli": "tsc -p src/cli",
     "build:plugin": "tsc -p src/plugin",
     "clean": "rimraf bin/ && rimraf dist/ && rimraf resources/",
@@ -46,8 +46,8 @@
     "svr": "nodemon --exec 'npm run demo'  -i demo -i src -i tests -i examples -e 'js html css'",
     "demo": "node-red -u ./demo --inspect",
     "test": "jest",
-    "copyfiles": "npm run copy-html && npm run copy-css && npm run copy-locales",
-    "copy-html": "copyfiles -f src/plugin/index.html dist",
+    "copyAssets": "npm run copy-html && npm run copy-css && npm run copy-locales",
+    "copy-html": "copyfiles -f src/plugin/beaver.html dist",
     "copy-locales": "copyfiles -u 2 ./src/plugin/locales/**/*.json dist",
     "copy-css": "copyfiles -f src/statics/style.css resources"
   },
