@@ -10,6 +10,7 @@ const PRIVATERED: NodeRedApp = (function requireExistingNoderedInstance() {
     if (require.main) {
         for (const child of require.main.children) {
             if (child.filename.endsWith('red.js')) {
+                // require node_modules/node-red/lib/red.js
                 return require(child.filename);
             }
         }
